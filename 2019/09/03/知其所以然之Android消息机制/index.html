@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta name="generator" content="Hexo 3.9.0">
+    <meta charset="utf-8">
+<title>知其所以然之Android消息机制 - 半山的博客</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+
+
+    <meta name="description" content="1 概述消息机制是Android中重要的线程间通信手段。 它的存在可以让一个线程通知另一个线程去工作。那么一个线程为什么会有让另一个线程工作的需求呢？ 可以看一个常见的应用场景——UI更新。Google官方有一句话解释了UI更新的规则：The Android UI toolkit is not thread-safe and the view must always be manipulated">
+<meta name="keywords" content="消息机制,Handler,Message">
+<meta property="og:type" content="article">
+<meta property="og:title" content="知其所以然之Android消息机制">
+<meta property="og:url" content="https://banshan.tech/2019/09/03/知其所以然之Android消息机制/index.html">
+<meta property="og:site_name" content="半山的博客">
+<meta property="og:description" content="1 概述消息机制是Android中重要的线程间通信手段。 它的存在可以让一个线程通知另一个线程去工作。那么一个线程为什么会有让另一个线程工作的需求呢？ 可以看一个常见的应用场景——UI更新。Google官方有一句话解释了UI更新的规则：The Android UI toolkit is not thread-safe and the view must always be manipulated">
+<meta property="og:locale" content="zh-CN">
+<meta property="og:image" content="https://banshan.tech/images/og_image.png">
+<meta property="og:updated_time" content="2019-09-20T09:18:23.247Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="知其所以然之Android消息机制">
+<meta name="twitter:description" content="1 概述消息机制是Android中重要的线程间通信手段。 它的存在可以让一个线程通知另一个线程去工作。那么一个线程为什么会有让另一个线程工作的需求呢？ 可以看一个常见的应用场景——UI更新。Google官方有一句话解释了UI更新的规则：The Android UI toolkit is not thread-safe and the view must always be manipulated">
+<meta name="twitter:image" content="https://banshan.tech/images/og_image.png">
+
+
+
+
+
+
+
+<link rel="icon" href="/images/banshan.png">
+
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.7.2/css/bulma.css">
+<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.4.1/css/all.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Ubuntu:400,600|Source+Code+Pro">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@9.12.0/styles/agate.css">
+
+
+    
+    
+    
+    <style>body>.footer,body>.navbar,body>.section{opacity:0}</style>
+    
+
+    
+    
+    
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.6.8/dist/css/lightgallery.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.7.0/dist/css/justifiedGallery.min.css">
+    
+
+    
+    
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/outdatedbrowser@1.1.5/outdatedbrowser/outdatedbrowser.min.css">
+
+
+    
+    
+    
+    
+
+<link rel="stylesheet" href="/css/back-to-top.css">
+
+
+    
+    
+
+    
+    
+    
+    
+
+    
+    
+<link rel="stylesheet" href="/css/progressbar.css">
+<script src="https://cdn.jsdelivr.net/npm/pace-js@1.0.2/pace.min.js"></script>
+
+    
+    
+    
+
+
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="is-2-column">
+    <nav class="navbar navbar-main">
+    <div class="container">
+        <div class="navbar-brand is-flex-center">
+            <a class="navbar-item navbar-logo" href="/">
+            
+                <img src="/images/banshan.png" alt="知其所以然之Android消息机制" height="28">
+            
+            </a>
+        </div>
+        <div class="navbar-menu">
+            
+            <div class="navbar-start">
+                
+                <a class="navbar-item" href="/">主页</a>
+                
+                <a class="navbar-item" href="/archives">归档</a>
+                
+                <a class="navbar-item" href="/categories">分类</a>
+                
+                <a class="navbar-item" href="/tags">标签</a>
+                
+                <a class="navbar-item" href="/about">关于</a>
+                
+            </div>
+            
+            <div class="navbar-end">
+                
+                
+                <a class="navbar-item is-hidden-tablet catalogue" title="目录" href="javascript:;">
+                    <i class="fas fa-list-ul"></i>
+                </a>
+                
+                
+                <a class="navbar-item search" title="搜索" href="javascript:;">
+                    <i class="fas fa-search"></i>
+                </a>
+                
+            </div>
+        </div>
+    </div>
+</nav>
+    
+    <section class="section">
+        <div class="container">
+            <div class="columns">
+                <div class="column is-10-tablet is-10-desktop is-10-widescreen has-order-2 column-main"><div class="card">
+    
+    <div class="card-content article ">
+        
+        <div class="level article-meta is-size-7 is-uppercase is-mobile is-overflow-x-auto">
+            <div class="level-left">
+                <time class="level-item has-text-grey" datetime="2019-09-03T12:00:00.000Z">2019-09-03</time>
+                
+                <div class="level-item">
+                <a class="has-link-grey -link" href="/categories/Android-Framework/">Android Framework</a>
+                </div>
+                
+                
+                
+            </div>
+        </div>
+        
+        <h1 class="title is-size-3 is-size-4-mobile has-text-weight-normal">
+            
+                知其所以然之Android消息机制
+            
+        </h1>
+        <div class="content">
+            <h2 id="1-概述"><a href="#1-概述" class="headerlink" title="1 概述"></a><strong>1 概述</strong></h2><p>消息机制是Android中重要的线程间通信手段。</p>
+<p>它的存在可以让一个线程通知另一个线程去工作。那么一个线程为什么会有让另一个线程工作的需求呢？</p>
+<p>可以看一个常见的应用场景——UI更新。Google官方有一句话解释了UI更新的规则：The Android UI toolkit is not thread-safe and the view must always be manipulated on the UI thread。 因为UI更新并不是线程安全的，所以Android为了规避开发者可能的不安全操作，干脆将所有UI更新都放在了主线程中进行。在这种场景下，就会出现其他线程请求主线程来帮忙更新UI的需求。</p>
+<p>除了UI更新，某些设计模式的实现也离不开消息机制。</p>
+<a id="more"></a>
+
+<p>下图便是消息机制最基本的工作方式。A线程发送消息到B线程的消息队列中，B线程不断从消息队列中取出新的消息进行处理。</p>
+<p><img src="https://raw.githubusercontent.com/banshann/Picbed/master/%E6%B6%88%E6%81%AF%E6%9C%BA%E5%88%B6%E7%9A%84%E5%B7%A5%E4%BD%9C%E6%A8%A1%E5%BC%8F.jpg" alt="消息机制示意图"></p>
+<p>线程A在这里表现的就像是一个甩手掌柜，只负责发送消息，却从不干活。而线程B就像是一个苦力，不断地处理到来的消息。</p>
+<h2 id="2-详细过程"><a href="#2-详细过程" class="headerlink" title="2 详细过程"></a><strong>2 详细过程</strong></h2><p>下图便是消息机制的详细过程，主要分为两个部分：</p>
+<ol>
+<li>消息发送过程</li>
+<li>消息处理过程</li>
+</ol>
+<p>消息通过Handler发送到另一个线程的MessageQueue中。另一个线程通过Looper不断轮询消息队列，取出其中的消息，并交给当初发送它的Handler进行处理。</p>
+<p><img src="https://raw.githubusercontent.com/banshann/Picbed/master/%E6%B6%88%E6%81%AF%E6%9C%BA%E5%88%B6%E8%AF%A6%E7%BB%86%E5%B7%A5%E4%BD%9C%E6%A8%A1%E5%BC%8F.jpg" alt="消息机制详细工作模式"></p>
+<p>上述详细过程有一个前提假设，也即线程B中存在Looper和MessageQueue。事实上，这两样东西并不是天生存在的。所以真正完整的详细过程包含以下三个部分：</p>
+<ol>
+<li>消息队列准备过程</li>
+<li>消息发送过程</li>
+<li>消息处理过程</li>
+</ol>
+<h3 id="2-1-消息队列准备过程"><a href="#2-1-消息队列准备过程" class="headerlink" title="2.1 消息队列准备过程"></a><strong>2.1 消息队列准备过程</strong></h3><p>在Android应用中，主线程自带Looper和MessageQueue，其他线程如果想具备消息机制的功能，则必须首先调用Looper.prepare()。</p>
+<p>主线程为什么会自带Looper和MessageQueue呢？</p>
+<p>所有Android应用的主线程都对应一个ActivityThread，正是由于所有Activity的回调方法都运行在主线程，所以Google便用ActivityThread来对应主线程。</p>
+<p>ActivityThread的main方法是每个Android应用启动时的入口。通过6642行代码可知，主线程并非自带了Looper和MessageQueue，而是在ActivityThread的main方法中提前为我们创建好了而已。6642行创建了主线程的Looper和MessageQueue（下文有详述），6669行便开始了Looper的循环工作：不断从MessageQueue中取出消息并执行，消息队列为空时就将所在线程挂起休息，有新的消息到来时再起来继续工作。周而复始，永不停歇。</p>
+<p>以上就是Android主线程的基本工作模型。至于我们所熟知的onCreate、onDestroy，其实背后也都是消息机制在起作用（当然还有Binder的身影）。</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/java/android/app/ActivityThread.java#6623" target="_blank" rel="noopener">/frameworks/base/core/java/android/app/ActivityThread.java</a></p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">6623</span>    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">static</span> <span class="hljs-keyword">void</span> <span class="hljs-title">main</span><span class="hljs-params">(String[] args)</span> </span>&#123;</span><br><span class="line"><span class="hljs-number">6624</span>        Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, <span class="hljs-string">"ActivityThreadMain"</span>);</span><br><span class="line"><span class="hljs-number">6625</span></span><br><span class="line"><span class="hljs-number">6626</span>        <span class="hljs-comment">// CloseGuard defaults to true and can be quite spammy.  We</span></span><br><span class="line"><span class="hljs-number">6627</span>        <span class="hljs-comment">// disable it here, but selectively enable it later (via</span></span><br><span class="line"><span class="hljs-number">6628</span>        <span class="hljs-comment">// StrictMode) on debug builds, but using DropBox, not logs.</span></span><br><span class="line"><span class="hljs-number">6629</span>        CloseGuard.setEnabled(<span class="hljs-keyword">false</span>);</span><br><span class="line"><span class="hljs-number">6630</span></span><br><span class="line"><span class="hljs-number">6631</span>        Environment.initForCurrentUser();</span><br><span class="line"><span class="hljs-number">6632</span></span><br><span class="line"><span class="hljs-number">6633</span>        <span class="hljs-comment">// Set the reporter for event logging in libcore</span></span><br><span class="line"><span class="hljs-number">6634</span>        EventLogger.setReporter(<span class="hljs-keyword">new</span> EventLoggingReporter());</span><br><span class="line"><span class="hljs-number">6635</span></span><br><span class="line"><span class="hljs-number">6636</span>        <span class="hljs-comment">// Make sure TrustedCertificateStore looks in the right place for CA certificates</span></span><br><span class="line"><span class="hljs-number">6637</span>        <span class="hljs-keyword">final</span> File configDir = Environment.getUserConfigDirectory(UserHandle.myUserId());</span><br><span class="line"><span class="hljs-number">6638</span>        TrustedCertificateStore.setDefaultUserDirectory(configDir);</span><br><span class="line"><span class="hljs-number">6639</span></span><br><span class="line"><span class="hljs-number">6640</span>        Process.setArgV0(<span class="hljs-string">"&lt;pre-initialized&gt;"</span>);</span><br><span class="line"><span class="hljs-number">6641</span></span><br><span class="line"><span class="hljs-number">6642</span>        Looper.prepareMainLooper();</span><br><span class="line"><span class="hljs-number">6643</span></span><br><span class="line"><span class="hljs-number">6644</span>        <span class="hljs-comment">// Find the value for &#123;@link #PROC_START_SEQ_IDENT&#125; if provided on the command line.</span></span><br><span class="line"><span class="hljs-number">6645</span>        <span class="hljs-comment">// It will be in the format "seq=114"</span></span><br><span class="line"><span class="hljs-number">6646</span>        <span class="hljs-keyword">long</span> startSeq = <span class="hljs-number">0</span>;</span><br><span class="line"><span class="hljs-number">6647</span>        <span class="hljs-keyword">if</span> (args != <span class="hljs-keyword">null</span>) &#123;</span><br><span class="line"><span class="hljs-number">6648</span>            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">int</span> i = args.length - <span class="hljs-number">1</span>; i &gt;= <span class="hljs-number">0</span>; --i) &#123;</span><br><span class="line"><span class="hljs-number">6649</span>                <span class="hljs-keyword">if</span> (args[i] != <span class="hljs-keyword">null</span> &amp;&amp; args[i].startsWith(PROC_START_SEQ_IDENT)) &#123;</span><br><span class="line"><span class="hljs-number">6650</span>                    startSeq = Long.parseLong(</span><br><span class="line"><span class="hljs-number">6651</span>                            args[i].substring(PROC_START_SEQ_IDENT.length()));</span><br><span class="line"><span class="hljs-number">6652</span>                &#125;</span><br><span class="line"><span class="hljs-number">6653</span>            &#125;</span><br><span class="line"><span class="hljs-number">6654</span>        &#125;</span><br><span class="line"><span class="hljs-number">6655</span>        ActivityThread thread = <span class="hljs-keyword">new</span> ActivityThread();</span><br><span class="line"><span class="hljs-number">6656</span>        thread.attach(<span class="hljs-keyword">false</span>, startSeq);</span><br><span class="line"><span class="hljs-number">6657</span></span><br><span class="line"><span class="hljs-number">6658</span>        <span class="hljs-keyword">if</span> (sMainThreadHandler == <span class="hljs-keyword">null</span>) &#123;</span><br><span class="line"><span class="hljs-number">6659</span>            sMainThreadHandler = thread.getHandler();</span><br><span class="line"><span class="hljs-number">6660</span>        &#125;</span><br><span class="line"><span class="hljs-number">6661</span></span><br><span class="line"><span class="hljs-number">6662</span>        <span class="hljs-keyword">if</span> (<span class="hljs-keyword">false</span>) &#123;</span><br><span class="line"><span class="hljs-number">6663</span>            Looper.myLooper().setMessageLogging(<span class="hljs-keyword">new</span></span><br><span class="line"><span class="hljs-number">6664</span>                    LogPrinter(Log.DEBUG, <span class="hljs-string">"ActivityThread"</span>));</span><br><span class="line"><span class="hljs-number">6665</span>        &#125;</span><br><span class="line"><span class="hljs-number">6666</span></span><br><span class="line"><span class="hljs-number">6667</span>        <span class="hljs-comment">// End of event ActivityThreadMain.</span></span><br><span class="line"><span class="hljs-number">6668</span>        Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);</span><br><span class="line"><span class="hljs-number">6669</span>        Looper.loop();</span><br><span class="line"><span class="hljs-number">6670</span></span><br><span class="line"><span class="hljs-number">6671</span>        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> RuntimeException(<span class="hljs-string">"Main thread loop unexpectedly exited"</span>);</span><br><span class="line"><span class="hljs-number">6672</span>    &#125;</span><br></pre></td></tr></table></figure>
+
+<p>Looper.prepareMainLooper是一个静态方法，它的作用是为主线程创建一个Looper和MessageQueue。其最终调用了prepare方法，创建了一个新的Looper并将它写入sThreadLocal字段。</p>
+<p>sThreadLocal字段是一个静态变量，按照常理它应该在内存中独一份，且各个线程均可访问的。但这里sThreadLocal利用了TLS（ThreadLocalStorage）的机制，每个线程访问到的sThreadLocal是相互独立的，并不是同一个。所以，主线程调用prepareMainLooper方法，相当于创建了一个线程独有的Looper，并且将这个Looper赋值给名为sMainLooper的静态变量（方便其他线程获取主线程的Looper）。</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/java/android/os/Looper.java#114" target="_blank" rel="noopener">/frameworks/base/core/java/android/os/Looper.java</a></p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">114</span>    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">static</span> <span class="hljs-keyword">void</span> <span class="hljs-title">prepareMainLooper</span><span class="hljs-params">()</span> </span>&#123;</span><br><span class="line"><span class="hljs-number">115</span>        prepare(<span class="hljs-keyword">false</span>);</span><br><span class="line"><span class="hljs-number">116</span>        <span class="hljs-keyword">synchronized</span> (Looper.class) &#123;</span><br><span class="line"><span class="hljs-number">117</span>            <span class="hljs-keyword">if</span> (sMainLooper != <span class="hljs-keyword">null</span>) &#123;</span><br><span class="line"><span class="hljs-number">118</span>                <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> IllegalStateException(<span class="hljs-string">"The main Looper has already been prepared."</span>);</span><br><span class="line"><span class="hljs-number">119</span>            &#125;</span><br><span class="line"><span class="hljs-number">120</span>            sMainLooper = myLooper();</span><br><span class="line"><span class="hljs-number">121</span>        &#125;</span><br><span class="line"><span class="hljs-number">122</span>    &#125;</span><br></pre></td></tr></table></figure>
+
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/java/android/os/Looper.java#97" target="_blank" rel="noopener">/frameworks/base/core/java/android/os/Looper.java</a></p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">97</span>    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">static</span> <span class="hljs-keyword">void</span> <span class="hljs-title">prepare</span><span class="hljs-params">()</span> </span>&#123;</span><br><span class="line"><span class="hljs-number">98</span>        prepare(<span class="hljs-keyword">true</span>);</span><br><span class="line"><span class="hljs-number">99</span>    &#125;</span><br><span class="line"><span class="hljs-number">100</span></span><br><span class="line"><span class="hljs-number">101</span>    <span class="hljs-function"><span class="hljs-keyword">private</span> <span class="hljs-keyword">static</span> <span class="hljs-keyword">void</span> <span class="hljs-title">prepare</span><span class="hljs-params">(<span class="hljs-keyword">boolean</span> quitAllowed)</span> </span>&#123;</span><br><span class="line"><span class="hljs-number">102</span>        <span class="hljs-keyword">if</span> (sThreadLocal.get() != <span class="hljs-keyword">null</span>) &#123;</span><br><span class="line"><span class="hljs-number">103</span>            <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> RuntimeException(<span class="hljs-string">"Only one Looper may be created per thread"</span>);</span><br><span class="line"><span class="hljs-number">104</span>        &#125;</span><br><span class="line"><span class="hljs-number">105</span>        sThreadLocal.set(<span class="hljs-keyword">new</span> Looper(quitAllowed));</span><br><span class="line"><span class="hljs-number">106</span>    &#125;</span><br></pre></td></tr></table></figure>
+
+<p><img src="https://raw.githubusercontent.com/banshann/Picbed/master/%E6%B6%88%E6%81%AF%E9%98%9F%E5%88%97%E5%87%86%E5%A4%87%E8%BF%87%E7%A8%8B.jpg" alt="消息队列准备过程"></p>
+<p>Looper的构造方法中会创建一个MessageQueue，所以调用Looper.prepare方法便会创建与线程唯一对应的Looper和MessageQueue。</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/java/android/os/Looper.java#267" target="_blank" rel="noopener">/frameworks/base/core/java/android/os/Looper.java</a></p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">267</span>    <span class="hljs-function"><span class="hljs-keyword">private</span> <span class="hljs-title">Looper</span><span class="hljs-params">(<span class="hljs-keyword">boolean</span> quitAllowed)</span> </span>&#123;</span><br><span class="line"><span class="hljs-number">268</span>        mQueue = <span class="hljs-keyword">new</span> MessageQueue(quitAllowed);</span><br><span class="line"><span class="hljs-number">269</span>        mThread = Thread.currentThread();</span><br><span class="line"><span class="hljs-number">270</span>    &#125;</span><br></pre></td></tr></table></figure>
+
+<p>MessageQueue的构造方法如下，它会调用nativeInit方法在native层做一些初始化的工作。</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/java/android/os/MessageQueue.java#70" target="_blank" rel="noopener">/frameworks/base/core/java/android/os/MessageQueue.java</a></p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">70</span>    MessageQueue(<span class="hljs-keyword">boolean</span> quitAllowed) &#123;</span><br><span class="line"><span class="hljs-number">71</span>        mQuitAllowed = quitAllowed;</span><br><span class="line"><span class="hljs-number">72</span>        mPtr = nativeInit();</span><br><span class="line"><span class="hljs-number">73</span>    &#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">63</span>    <span class="hljs-function"><span class="hljs-keyword">private</span> <span class="hljs-keyword">native</span> <span class="hljs-keyword">static</span> <span class="hljs-keyword">long</span> <span class="hljs-title">nativeInit</span><span class="hljs-params">()</span></span>;</span><br></pre></td></tr></table></figure>
+
+<p>nativeInit对应的JNI方法为android_os_MessageQueue_nativeInit，其中创建了一个NativeMessageQueue对象，并将该对象的指针转化为long型传递给java层。在Android的世界中，存在大量java层对象和native层对象一一映射的关系，通常都是在java层对象中设立一个long型的字段，用于记录native对象的指针值。</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/jni/android_os_MessageQueue.cpp#172" target="_blank" rel="noopener">/frameworks/base/core/jni/android_os_MessageQueue.cpp</a></p>
+<figure class="highlight c++ hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">172</span><span class="hljs-function"><span class="hljs-keyword">static</span> jlong <span class="hljs-title">android_os_MessageQueue_nativeInit</span><span class="hljs-params">(JNIEnv* env, jclass clazz)</span> </span>&#123;</span><br><span class="line"><span class="hljs-number">173</span>    NativeMessageQueue* nativeMessageQueue = <span class="hljs-keyword">new</span> NativeMessageQueue();</span><br><span class="line"><span class="hljs-number">174</span>    <span class="hljs-keyword">if</span> (!nativeMessageQueue) &#123;</span><br><span class="line"><span class="hljs-number">175</span>        jniThrowRuntimeException(env, <span class="hljs-string">"Unable to allocate native queue"</span>);</span><br><span class="line"><span class="hljs-number">176</span>        <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;</span><br><span class="line"><span class="hljs-number">177</span>    &#125;</span><br><span class="line"><span class="hljs-number">178</span></span><br><span class="line"><span class="hljs-number">179</span>    nativeMessageQueue-&gt;incStrong(env);</span><br><span class="line"><span class="hljs-number">180</span>    <span class="hljs-keyword">return</span> <span class="hljs-keyword">reinterpret_cast</span>&lt;jlong&gt;(nativeMessageQueue);</span><br><span class="line"><span class="hljs-number">181</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在NativeMessageQueue的构造函数中创建一个native层的Looper，并通过TLS的机制和线程绑定。</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/jni/android_os_MessageQueue.cpp#78" target="_blank" rel="noopener">/frameworks/base/core/jni/android_os_MessageQueue.cpp</a></p>
+<figure class="highlight c++ hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">78</span>NativeMessageQueue::NativeMessageQueue() :</span><br><span class="line"><span class="hljs-number">79</span>        mPollEnv(<span class="hljs-literal">NULL</span>), mPollObj(<span class="hljs-literal">NULL</span>), mExceptionObj(<span class="hljs-literal">NULL</span>) &#123;</span><br><span class="line"><span class="hljs-number">80</span>    mLooper = Looper::getForThread();</span><br><span class="line"><span class="hljs-number">81</span>    <span class="hljs-keyword">if</span> (mLooper == <span class="hljs-literal">NULL</span>) &#123;</span><br><span class="line"><span class="hljs-number">82</span>        mLooper = <span class="hljs-keyword">new</span> Looper(<span class="hljs-literal">false</span>);</span><br><span class="line"><span class="hljs-number">83</span>        Looper::setForThread(mLooper);</span><br><span class="line"><span class="hljs-number">84</span>    &#125;</span><br><span class="line"><span class="hljs-number">85</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在native层Looper的构造过程中，67行的代码非常关键。它用于mWakeEventFd的初始化，创建出来的eventfd将会在rebuildEpollLocked函数中被epoll监听（151行）。Epoll机制是Linux内核中一种事件触发的机制，可以同时监听多个文件描述符。在调用epoll_wait将线程挂起的时候，如果有被监测的事件产生，则线程从挂起状态恢复，重新恢复运行。这其实是一种中断式的wait/notify机制。如果想了解这个机制的详细内容，可以参考这两篇博客：<a href="https://medium.com/@copyconstruct/the-method-to-epolls-madness-d9d2d6378642" target="_blank" rel="noopener"><strong>博客1</strong></a> 和<a href="https://eklitzke.org/blocking-io-nonblocking-io-and-epoll" target="_blank" rel="noopener"><strong>博客2</strong></a>。博客1中对epoll的基本概念讲述较多，博客2对epoll中的Level Trigger和Edge Trigger讲的非常清楚。</p>
+<p>我们以149行到151行的代码为例，EPOLLIN表示监测mWakeEventFd上的可读事件，当该线程调用epoll_wait时，如果mWakeEventFd上有可读事件，则线程直接返回，否则挂起。在该线程挂起的时候，如果有其他线程往mWakeEventFd上写入新的数据，则该线程会接收到事件，并从挂起状态恢复为运行状态。</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/system/core/libutils/Looper.cpp#63" target="_blank" rel="noopener">/system/core/libutils/Looper.cpp</a></p>
+<figure class="highlight c++ hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">63L</span>ooper::Looper(<span class="hljs-keyword">bool</span> allowNonCallbacks) :</span><br><span class="line"><span class="hljs-number">64</span>        mAllowNonCallbacks(allowNonCallbacks), mSendingMessage(<span class="hljs-literal">false</span>),</span><br><span class="line"><span class="hljs-number">65</span>        mPolling(<span class="hljs-literal">false</span>), mEpollFd(<span class="hljs-number">-1</span>), mEpollRebuildRequired(<span class="hljs-literal">false</span>),</span><br><span class="line"><span class="hljs-number">66</span>        mNextRequestSeq(<span class="hljs-number">0</span>), mResponseIndex(<span class="hljs-number">0</span>), mNextMessageUptime(LLONG_MAX) &#123;</span><br><span class="line"><span class="hljs-number">67</span>    mWakeEventFd = eventfd(<span class="hljs-number">0</span>, EFD_NONBLOCK | EFD_CLOEXEC);</span><br><span class="line"><span class="hljs-number">68</span>    LOG_ALWAYS_FATAL_IF(mWakeEventFd &lt; <span class="hljs-number">0</span>, <span class="hljs-string">"Could not make wake event fd: %s"</span>,</span><br><span class="line"><span class="hljs-number">69</span>                        strerror(errno));</span><br><span class="line"><span class="hljs-number">70</span></span><br><span class="line"><span class="hljs-number">71</span>    AutoMutex _l(mLock);</span><br><span class="line"><span class="hljs-number">72</span>    rebuildEpollLocked();</span><br><span class="line"><span class="hljs-number">73</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<p><a href="http://androidxref.com/9.0.0_r3/xref/system/core/libutils/Looper.cpp#134" target="_blank" rel="noopener">/system/core/libutils/Looper.cpp</a></p>
+<figure class="highlight c++ hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">134</span><span class="hljs-keyword">void</span> Looper::rebuildEpollLocked() &#123;</span><br><span class="line"><span class="hljs-number">135</span>    <span class="hljs-comment">// Close old epoll instance if we have one.</span></span><br><span class="line"><span class="hljs-number">136</span>    <span class="hljs-keyword">if</span> (mEpollFd &gt;= <span class="hljs-number">0</span>) &#123;</span><br><span class="line"><span class="hljs-number">137</span><span class="hljs-meta">#<span class="hljs-meta-keyword">if</span> DEBUG_CALLBACKS</span></span><br><span class="line"><span class="hljs-number">138</span>        ALOGD(<span class="hljs-string">"%p ~ rebuildEpollLocked - rebuilding epoll set"</span>, <span class="hljs-keyword">this</span>);</span><br><span class="line"><span class="hljs-number">139</span><span class="hljs-meta">#<span class="hljs-meta-keyword">endif</span></span></span><br><span class="line"><span class="hljs-number">140</span>        close(mEpollFd);</span><br><span class="line"><span class="hljs-number">141</span>    &#125;</span><br><span class="line"><span class="hljs-number">142</span></span><br><span class="line"><span class="hljs-number">143</span>    <span class="hljs-comment">// Allocate the new epoll instance and register the wake pipe.</span></span><br><span class="line"><span class="hljs-number">144</span>    mEpollFd = epoll_create(EPOLL_SIZE_HINT);</span><br><span class="line"><span class="hljs-number">145</span>    LOG_ALWAYS_FATAL_IF(mEpollFd &lt; <span class="hljs-number">0</span>, <span class="hljs-string">"Could not create epoll instance: %s"</span>, strerror(errno));</span><br><span class="line"><span class="hljs-number">146</span></span><br><span class="line"><span class="hljs-number">147</span>    <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">epoll_event</span> <span class="hljs-title">eventItem</span>;</span></span><br><span class="line"><span class="hljs-number">148</span>    <span class="hljs-built_in">memset</span>(&amp; eventItem, <span class="hljs-number">0</span>, <span class="hljs-keyword">sizeof</span>(epoll_event)); <span class="hljs-comment">// zero out unused members of data field union</span></span><br><span class="line"><span class="hljs-number">149</span>    eventItem.events = EPOLLIN;</span><br><span class="line"><span class="hljs-number">150</span>    eventItem.data.fd = mWakeEventFd;</span><br><span class="line"><span class="hljs-number">151</span>    <span class="hljs-keyword">int</span> result = epoll_ctl(mEpollFd, EPOLL_CTL_ADD, mWakeEventFd, &amp; eventItem);</span><br><span class="line"><span class="hljs-number">152</span>    LOG_ALWAYS_FATAL_IF(result != <span class="hljs-number">0</span>, <span class="hljs-string">"Could not add wake event fd to epoll instance: %s"</span>,</span><br><span class="line"><span class="hljs-number">153</span>                        strerror(errno));</span><br><span class="line"><span class="hljs-number">154</span></span><br><span class="line"><span class="hljs-number">155</span>    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">size_t</span> i = <span class="hljs-number">0</span>; i &lt; mRequests.size(); i++) &#123;</span><br><span class="line"><span class="hljs-number">156</span>        <span class="hljs-keyword">const</span> Request&amp; request = mRequests.valueAt(i);</span><br><span class="line"><span class="hljs-number">157</span>        <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">epoll_event</span> <span class="hljs-title">eventItem</span>;</span></span><br><span class="line"><span class="hljs-number">158</span>        request.initEventItem(&amp;eventItem);</span><br><span class="line"><span class="hljs-number">159</span></span><br><span class="line"><span class="hljs-number">160</span>        <span class="hljs-keyword">int</span> epollResult = epoll_ctl(mEpollFd, EPOLL_CTL_ADD, request.fd, &amp; eventItem);</span><br><span class="line"><span class="hljs-number">161</span>        <span class="hljs-keyword">if</span> (epollResult &lt; <span class="hljs-number">0</span>) &#123;</span><br><span class="line"><span class="hljs-number">162</span>            ALOGE(<span class="hljs-string">"Error adding epoll events for fd %d while rebuilding epoll set: %s"</span>,</span><br><span class="line"><span class="hljs-number">163</span>                  request.fd, strerror(errno));</span><br><span class="line"><span class="hljs-number">164</span>        &#125;</span><br><span class="line"><span class="hljs-number">165</span>    &#125;</span><br><span class="line"><span class="hljs-number">166</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<p>综上所述，一个可以处理消息的线程，必然会有一个唯一的Looper和唯一的MessageQueue。</p>
+<h3 id="2-2-消息发送过程"><a href="#2-2-消息发送过程" class="headerlink" title="2.2 消息发送过程"></a><strong>2.2 消息发送过程</strong></h3><p>消息通过Handler进行发送。</p>
+<p>通过调用Handler类的sendMessage方法，我们可以发送一个消息。sendMessage最终调用的是sendMessageAtTime方法。参数uptimeMillis表示希望消息发送的时间点距离开机时间点的毫秒数，譬如手机15:00:00开机，消息发送者希望这条消息15:00:01准时发送，那么传入的uptimeMillis就是1000。</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/java/android/os/Handler.java#602" target="_blank" rel="noopener">/frameworks/base/core/java/android/os/Handler.java</a></p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">602</span>    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">final</span> <span class="hljs-keyword">boolean</span> <span class="hljs-title">sendMessage</span><span class="hljs-params">(Message msg)</span></span></span><br><span class="line"><span class="hljs-function">603    </span>&#123;</span><br><span class="line"><span class="hljs-number">604</span>        <span class="hljs-keyword">return</span> sendMessageDelayed(msg, <span class="hljs-number">0</span>);</span><br><span class="line"><span class="hljs-number">605</span>    &#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">662</span>    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">final</span> <span class="hljs-keyword">boolean</span> <span class="hljs-title">sendMessageDelayed</span><span class="hljs-params">(Message msg, <span class="hljs-keyword">long</span> delayMillis)</span></span></span><br><span class="line"><span class="hljs-function">663    </span>&#123;</span><br><span class="line"><span class="hljs-number">664</span>        <span class="hljs-keyword">if</span> (delayMillis &lt; <span class="hljs-number">0</span>) &#123;</span><br><span class="line"><span class="hljs-number">665</span>            delayMillis = <span class="hljs-number">0</span>;</span><br><span class="line"><span class="hljs-number">666</span>        &#125;</span><br><span class="line"><span class="hljs-number">667</span>        <span class="hljs-keyword">return</span> sendMessageAtTime(msg, SystemClock.uptimeMillis() + delayMillis);</span><br><span class="line"><span class="hljs-number">668</span>    &#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">689</span>    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">boolean</span> <span class="hljs-title">sendMessageAtTime</span><span class="hljs-params">(Message msg, <span class="hljs-keyword">long</span> uptimeMillis)</span> </span>&#123;</span><br><span class="line"><span class="hljs-number">690</span>        MessageQueue queue = mQueue;</span><br><span class="line"><span class="hljs-number">691</span>        <span class="hljs-keyword">if</span> (queue == <span class="hljs-keyword">null</span>) &#123;</span><br><span class="line"><span class="hljs-number">692</span>            RuntimeException e = <span class="hljs-keyword">new</span> RuntimeException(</span><br><span class="line"><span class="hljs-number">693</span>                    <span class="hljs-keyword">this</span> + <span class="hljs-string">" sendMessageAtTime() called with no mQueue"</span>);</span><br><span class="line"><span class="hljs-number">694</span>            Log.w(<span class="hljs-string">"Looper"</span>, e.getMessage(), e);</span><br><span class="line"><span class="hljs-number">695</span>            <span class="hljs-keyword">return</span> <span class="hljs-keyword">false</span>;</span><br><span class="line"><span class="hljs-number">696</span>        &#125;</span><br><span class="line"><span class="hljs-number">697</span>        <span class="hljs-keyword">return</span> enqueueMessage(queue, msg, uptimeMillis);</span><br><span class="line"><span class="hljs-number">698</span>    &#125;</span><br></pre></td></tr></table></figure>
+
+<p>sendMessageAtTime方法取出Handler的mQueue字段，并调用enqueueMessage方法。enqueueMessage的作用就是将消息加入到消息队列中。首先，将消息的target字段设置为发送时的Handler，表明这个消息被接收后依然由此Handler进行处理。其后根据Handler是否异步来决定发送的消息是否异步。最后调用MessageQueue的enqueueMessage方法。</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/java/android/os/Handler.java#740" target="_blank" rel="noopener">/frameworks/base/core/java/android/os/Handler.java</a></p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">740</span>    <span class="hljs-function"><span class="hljs-keyword">private</span> <span class="hljs-keyword">boolean</span> <span class="hljs-title">enqueueMessage</span><span class="hljs-params">(MessageQueue queue, Message msg, <span class="hljs-keyword">long</span> uptimeMillis)</span> </span>&#123;</span><br><span class="line"><span class="hljs-number">741</span>        msg.target = <span class="hljs-keyword">this</span>;</span><br><span class="line"><span class="hljs-number">742</span>        <span class="hljs-keyword">if</span> (mAsynchronous) &#123;</span><br><span class="line"><span class="hljs-number">743</span>            msg.setAsynchronous(<span class="hljs-keyword">true</span>);</span><br><span class="line"><span class="hljs-number">744</span>        &#125;</span><br><span class="line"><span class="hljs-number">745</span>        <span class="hljs-keyword">return</span> queue.enqueueMessage(msg, uptimeMillis);</span><br><span class="line"><span class="hljs-number">746</span>    &#125;</span><br></pre></td></tr></table></figure>
+
+<p>745行的queue是从Handler的sendMessageAtTime方法中传递过来的，它是Handler对象的mQueue字段，在Handler对象的构造方法中被赋值。为了搞清楚mQueue的来及，我们有必要看一看Handler的构造方法。</p>
+<h4 id="2-2-1-消息被发送到哪个线程？"><a href="#2-2-1-消息被发送到哪个线程？" class="headerlink" title="2.2.1 消息被发送到哪个线程？"></a><strong>2.2.1 消息被发送到哪个线程？</strong></h4><p>Handler的构造方法被重载了很多个，但底层其实都是这两个：</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/java/android/os/Handler.java#192" target="_blank" rel="noopener">/frameworks/base/core/java/android/os/Handler.java</a></p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">192</span>    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-title">Handler</span><span class="hljs-params">(Callback callback, <span class="hljs-keyword">boolean</span> async)</span> </span>&#123;</span><br><span class="line"><span class="hljs-number">193</span>        <span class="hljs-keyword">if</span> (FIND_POTENTIAL_LEAKS) &#123;</span><br><span class="line"><span class="hljs-number">194</span>            <span class="hljs-keyword">final</span> Class&lt;? extends Handler&gt; klass = getClass();</span><br><span class="line"><span class="hljs-number">195</span>            <span class="hljs-keyword">if</span> ((klass.isAnonymousClass() || klass.isMemberClass() || klass.isLocalClass()) &amp;&amp;</span><br><span class="line"><span class="hljs-number">196</span>                    (klass.getModifiers() &amp; Modifier.STATIC) == <span class="hljs-number">0</span>) &#123;</span><br><span class="line"><span class="hljs-number">197</span>                Log.w(TAG, <span class="hljs-string">"The following Handler class should be static or leaks might occur: "</span> +</span><br><span class="line"><span class="hljs-number">198</span>                    klass.getCanonicalName());</span><br><span class="line"><span class="hljs-number">199</span>            &#125;</span><br><span class="line"><span class="hljs-number">200</span>        &#125;</span><br><span class="line"><span class="hljs-number">201</span></span><br><span class="line"><span class="hljs-number">202</span>        mLooper = Looper.myLooper();</span><br><span class="line"><span class="hljs-number">203</span>        <span class="hljs-keyword">if</span> (mLooper == <span class="hljs-keyword">null</span>) &#123;</span><br><span class="line"><span class="hljs-number">204</span>            <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> RuntimeException(</span><br><span class="line"><span class="hljs-number">205</span>                <span class="hljs-string">"Can't create handler inside thread "</span> + Thread.currentThread()</span><br><span class="line"><span class="hljs-number">206</span>                        + <span class="hljs-string">" that has not called Looper.prepare()"</span>);</span><br><span class="line"><span class="hljs-number">207</span>        &#125;</span><br><span class="line"><span class="hljs-number">208</span>        mQueue = mLooper.mQueue;</span><br><span class="line"><span class="hljs-number">209</span>        mCallback = callback;</span><br><span class="line"><span class="hljs-number">210</span>        mAsynchronous = async;</span><br><span class="line"><span class="hljs-number">211</span>    &#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">232</span>    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-title">Handler</span><span class="hljs-params">(Looper looper, Callback callback, <span class="hljs-keyword">boolean</span> async)</span> </span>&#123;</span><br><span class="line"><span class="hljs-number">233</span>        mLooper = looper;</span><br><span class="line"><span class="hljs-number">234</span>        mQueue = looper.mQueue;</span><br><span class="line"><span class="hljs-number">235</span>        mCallback = callback;</span><br><span class="line"><span class="hljs-number">236</span>        mAsynchronous = async;</span><br><span class="line"><span class="hljs-number">237</span>    &#125;</span><br></pre></td></tr></table></figure>
+
+<p>二者最大的区别就在于，一个传入了Looper，另一个没有传入Looper。</p>
+<p>传入Looper的话，Handler对象的mQueue就等于looper.mQueue。假设Handler对象在线程A中创建，其构造时传入的是线程B的Looper，那么通过这个Handler发送的消息就将由线程B来处理。</p>
+<p>没有传入Looper的话，Handler对象的mQueue就等于其创建线程的Looper。依然假设Handler对象在线程A中创建，此时构造Handler时没有传入Looper，那么通过这个Handler发送的消息就将由线程A来处理。</p>
+<p>请仔细体会上述两种情况的区别。</p>
+<p>针对没有传入Looper的情况，这里还要多提几句。Handler对象创建之后，由于它存在于Java堆上，所以可以被任何线程访问、使用。任何线程通过它发送的消息，最终都将汇总到其创建线程的MessageQueue中，包括在它的创建线程中发送消息。</p>
+<p>下面看看MessageQueue的enqueueMessage方法做了哪些工作。</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/java/android/os/MessageQueue.java#536" target="_blank" rel="noopener">/frameworks/base/core/java/android/os/MessageQueue.java</a></p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">536</span>    <span class="hljs-function"><span class="hljs-keyword">boolean</span> <span class="hljs-title">enqueueMessage</span><span class="hljs-params">(Message msg, <span class="hljs-keyword">long</span> when)</span> </span>&#123;</span><br><span class="line"><span class="hljs-number">537</span>        <span class="hljs-keyword">if</span> (msg.target == <span class="hljs-keyword">null</span>) &#123;</span><br><span class="line"><span class="hljs-number">538</span>            <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> IllegalArgumentException(<span class="hljs-string">"Message must have a target."</span>);</span><br><span class="line"><span class="hljs-number">539</span>        &#125;</span><br><span class="line"><span class="hljs-number">540</span>        <span class="hljs-keyword">if</span> (msg.isInUse()) &#123;</span><br><span class="line"><span class="hljs-number">541</span>            <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> IllegalStateException(msg + <span class="hljs-string">" This message is already in use."</span>);</span><br><span class="line"><span class="hljs-number">542</span>        &#125;</span><br><span class="line"><span class="hljs-number">543</span></span><br><span class="line"><span class="hljs-number">544</span>        <span class="hljs-keyword">synchronized</span> (<span class="hljs-keyword">this</span>) &#123;</span><br><span class="line"><span class="hljs-number">545</span>            <span class="hljs-keyword">if</span> (mQuitting) &#123;</span><br><span class="line"><span class="hljs-number">546</span>                IllegalStateException e = <span class="hljs-keyword">new</span> IllegalStateException(</span><br><span class="line"><span class="hljs-number">547</span>                        msg.target + <span class="hljs-string">" sending message to a Handler on a dead thread"</span>);</span><br><span class="line"><span class="hljs-number">548</span>                Log.w(TAG, e.getMessage(), e);</span><br><span class="line"><span class="hljs-number">549</span>                msg.recycle();</span><br><span class="line"><span class="hljs-number">550</span>                <span class="hljs-keyword">return</span> <span class="hljs-keyword">false</span>;</span><br><span class="line"><span class="hljs-number">551</span>            &#125;</span><br><span class="line"><span class="hljs-number">552</span></span><br><span class="line"><span class="hljs-number">553</span>            msg.markInUse();</span><br><span class="line"><span class="hljs-number">554</span>            msg.when = when;</span><br><span class="line"><span class="hljs-number">555</span>            Message p = mMessages;</span><br><span class="line"><span class="hljs-number">556</span>            <span class="hljs-keyword">boolean</span> needWake;</span><br><span class="line"><span class="hljs-number">557</span>            <span class="hljs-keyword">if</span> (p == <span class="hljs-keyword">null</span> || when == <span class="hljs-number">0</span> || when &lt; p.when) &#123;</span><br><span class="line"><span class="hljs-number">558</span>                <span class="hljs-comment">// New head, wake up the event queue if blocked.</span></span><br><span class="line"><span class="hljs-number">559</span>                msg.next = p;</span><br><span class="line"><span class="hljs-number">560</span>                mMessages = msg;</span><br><span class="line"><span class="hljs-number">561</span>                needWake = mBlocked;</span><br><span class="line"><span class="hljs-number">562</span>            &#125; <span class="hljs-keyword">else</span> &#123;</span><br><span class="line"><span class="hljs-number">563</span>                <span class="hljs-comment">// Inserted within the middle of the queue.  Usually we don't have to wake</span></span><br><span class="line"><span class="hljs-number">564</span>                <span class="hljs-comment">// up the event queue unless there is a barrier at the head of the queue</span></span><br><span class="line"><span class="hljs-number">565</span>                <span class="hljs-comment">// and the message is the earliest asynchronous message in the queue.</span></span><br><span class="line"><span class="hljs-number">566</span>                needWake = mBlocked &amp;&amp; p.target == <span class="hljs-keyword">null</span> &amp;&amp; msg.isAsynchronous();</span><br><span class="line"><span class="hljs-number">567</span>                Message prev;</span><br><span class="line"><span class="hljs-number">568</span>                <span class="hljs-keyword">for</span> (;;) &#123;</span><br><span class="line"><span class="hljs-number">569</span>                    prev = p;</span><br><span class="line"><span class="hljs-number">570</span>                    p = p.next;</span><br><span class="line"><span class="hljs-number">571</span>                    <span class="hljs-keyword">if</span> (p == <span class="hljs-keyword">null</span> || when &lt; p.when) &#123;</span><br><span class="line"><span class="hljs-number">572</span>                        <span class="hljs-keyword">break</span>;</span><br><span class="line"><span class="hljs-number">573</span>                    &#125;</span><br><span class="line"><span class="hljs-number">574</span>                    <span class="hljs-keyword">if</span> (needWake &amp;&amp; p.isAsynchronous()) &#123;</span><br><span class="line"><span class="hljs-number">575</span>                        needWake = <span class="hljs-keyword">false</span>;</span><br><span class="line"><span class="hljs-number">576</span>                    &#125;</span><br><span class="line"><span class="hljs-number">577</span>                &#125;</span><br><span class="line"><span class="hljs-number">578</span>                msg.next = p; <span class="hljs-comment">// invariant: p == prev.next</span></span><br><span class="line"><span class="hljs-number">579</span>                prev.next = msg;</span><br><span class="line"><span class="hljs-number">580</span>            &#125;</span><br><span class="line"><span class="hljs-number">581</span></span><br><span class="line"><span class="hljs-number">582</span>            <span class="hljs-comment">// We can assume mPtr != 0 because mQuitting is false.</span></span><br><span class="line"><span class="hljs-number">583</span>            <span class="hljs-keyword">if</span> (needWake) &#123;</span><br><span class="line"><span class="hljs-number">584</span>                nativeWake(mPtr);</span><br><span class="line"><span class="hljs-number">585</span>            &#125;</span><br><span class="line"><span class="hljs-number">586</span>        &#125;</span><br><span class="line"><span class="hljs-number">587</span>        <span class="hljs-keyword">return</span> <span class="hljs-keyword">true</span>;</span><br><span class="line"><span class="hljs-number">588</span>    &#125;</span><br></pre></td></tr></table></figure>
+
+<p>跳过enqueueMessage方法中的异常判断，其核心的作用只有一个：将新消息加入MessageQueue中的消息链表中。MessageQueue中的Message通过链表的方式进行管理，其中的消息按照发送时间的先后顺序排列。在管理链表的过程中，只需持有头部对象就可以遍历所有的对象。因此MessageQueue只用了一个字段（mMessages）来记录消息链表的头部消息。</p>
+<h4 id="2-2-2-消息应该被插入到链表的什么位置？"><a href="#2-2-2-消息应该被插入到链表的什么位置？" class="headerlink" title="2.2.2 消息应该被插入到链表的什么位置？"></a><strong>2.2.2 消息应该被插入到链表的什么位置？</strong></h4><p>557行和562行分别表示对新消息的两种处理方式，第一种是将新消息插入到链表头部，第二种是将新消息插入到链表中间（或尾部）。</p>
+<p>先分析插入链表头部的情况。</p>
+<ul>
+<li>p == null 表示MessageQueue的消息链表为空，也即所有消息发送完毕，新加入的消息理所应当插入到头部。</li>
+<li>when == 0表示消息通过sendMessageAtTime方法发送，且传入的uptime为0，此类消息优先级最高，不管消息链表中是何种情况，新加入的消息都要插入到头部。</li>
+<li>when &lt; p.when表示新消息预设的发送时间要早于现有头部消息的发送时间，根据时间越早越靠前的原则，新加入的消息要插入到头部。</li>
+</ul>
+<p>除了插入到头部的三种情况外，其他情况下消息都将插入到链表中间（或尾部）。568行的for循环其实就是遍历消息链表，根据发送时间的先后顺序将消息插入到链表中。</p>
+<h4 id="2-2-3-消息加入链表后是否应该主动唤醒线程？"><a href="#2-2-3-消息加入链表后是否应该主动唤醒线程？" class="headerlink" title="2.2.3 消息加入链表后是否应该主动唤醒线程？"></a><strong>2.2.3 消息加入链表后是否应该主动唤醒线程？</strong></h4><p>除了需要将新消息插入到链表的合适位置，enqueueMessage还要决定是否唤醒MessageQueue所在的线程。MessageQueue的mBlocked字段记录了其所属线程是否已经发生阻塞（被挂起），该字段在消息处理的过程中被赋值。</p>
+<p>当新消息插入到链表头部时，needWake = mBlocked：</p>
+<ol>
+<li>如果MessageQueue此时已经发生阻塞，则新消息插入头部时，需要唤醒阻塞线程，以便让它根据头部的新消息重新决定处理逻辑（可能是立即处理，也可能是延时处理）。</li>
+<li>如果MessageQueue此时未发生阻塞，则新消息插入头部后无需做多余处理。它只需要静静地等在那里，线程处理完手中的消息后自然会同它碰面。</li>
+</ol>
+<p>当新消息插入到链表中间（或尾部）时，needWake的赋值变得复杂起来。这主要是由于异步消息和同步屏障的存在。</p>
+<p>同步屏障像是一个守卫，当消息链表的头部是一个同步屏障时，后续的同步消息都无法被放行，即便这些消息已经满足发送的时间要求。此时，链表上的异步消息却不受影响，它们照常按照发送时间的逻辑，顺利地被处理。</p>
+<p>同步屏障是一种特殊的Message，它的target为null，表明这个消息是不需要被处理的，而普通消息的target都是最终来处理该消息的Handler。通过MessageQueue的postSyncBarrier方法可以放置同步屏障，只不过这个方法是hide的，而且从Android P开始，反射调用非 SDK 的接口被限制了。虽然网上有一些手段可以绕开这种限制，但Google的本意应该是不想让开发者再使用同步屏障了。与之对应，撤除同步屏障的方法是removeSyncBarrier。</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/java/android/os/MessageQueue.java#461" target="_blank" rel="noopener">/frameworks/base/core/java/android/os/MessageQueue.java</a></p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">461</span>    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">int</span> <span class="hljs-title">postSyncBarrier</span><span class="hljs-params">()</span> </span>&#123;</span><br><span class="line"><span class="hljs-number">462</span>        <span class="hljs-keyword">return</span> postSyncBarrier(SystemClock.uptimeMillis());</span><br><span class="line"><span class="hljs-number">463</span>    &#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">465</span>    <span class="hljs-function"><span class="hljs-keyword">private</span> <span class="hljs-keyword">int</span> <span class="hljs-title">postSyncBarrier</span><span class="hljs-params">(<span class="hljs-keyword">long</span> when)</span> </span>&#123;</span><br><span class="line"><span class="hljs-number">466</span>        <span class="hljs-comment">// Enqueue a new sync barrier token.</span></span><br><span class="line"><span class="hljs-number">467</span>        <span class="hljs-comment">// We don't need to wake the queue because the purpose of a barrier is to stall it.</span></span><br><span class="line"><span class="hljs-number">468</span>        <span class="hljs-keyword">synchronized</span> (<span class="hljs-keyword">this</span>) &#123;</span><br><span class="line"><span class="hljs-number">469</span>            <span class="hljs-keyword">final</span> <span class="hljs-keyword">int</span> token = mNextBarrierToken++;</span><br><span class="line"><span class="hljs-number">470</span>            <span class="hljs-keyword">final</span> Message msg = Message.obtain();</span><br><span class="line"><span class="hljs-number">471</span>            msg.markInUse();</span><br><span class="line"><span class="hljs-number">472</span>            msg.when = when;</span><br><span class="line"><span class="hljs-number">473</span>            msg.arg1 = token;</span><br><span class="line"><span class="hljs-number">474</span></span><br><span class="line"><span class="hljs-number">475</span>            Message prev = <span class="hljs-keyword">null</span>;</span><br><span class="line"><span class="hljs-number">476</span>            Message p = mMessages;</span><br><span class="line"><span class="hljs-number">477</span>            <span class="hljs-keyword">if</span> (when != <span class="hljs-number">0</span>) &#123;</span><br><span class="line"><span class="hljs-number">478</span>                <span class="hljs-keyword">while</span> (p != <span class="hljs-keyword">null</span> &amp;&amp; p.when &lt;= when) &#123;</span><br><span class="line"><span class="hljs-number">479</span>                    prev = p;</span><br><span class="line"><span class="hljs-number">480</span>                    p = p.next;</span><br><span class="line"><span class="hljs-number">481</span>                &#125;</span><br><span class="line"><span class="hljs-number">482</span>            &#125;</span><br><span class="line"><span class="hljs-number">483</span>            <span class="hljs-keyword">if</span> (prev != <span class="hljs-keyword">null</span>) &#123; <span class="hljs-comment">// invariant: p == prev.next</span></span><br><span class="line"><span class="hljs-number">484</span>                msg.next = p;</span><br><span class="line"><span class="hljs-number">485</span>                prev.next = msg;</span><br><span class="line"><span class="hljs-number">486</span>            &#125; <span class="hljs-keyword">else</span> &#123;</span><br><span class="line"><span class="hljs-number">487</span>                msg.next = p;</span><br><span class="line"><span class="hljs-number">488</span>                mMessages = msg;</span><br><span class="line"><span class="hljs-number">489</span>            &#125;</span><br><span class="line"><span class="hljs-number">490</span>            <span class="hljs-keyword">return</span> token;</span><br><span class="line"><span class="hljs-number">491</span>        &#125;</span><br><span class="line"><span class="hljs-number">492</span>    &#125;</span><br></pre></td></tr></table></figure>
+
+<p>同步消息和异步消息的唯一差异在于Message的flag是否被置上<code>FLAG_ASYNCHRONOUS</code>标志位。这个标志位只在setAsynchronous方法中被改变。如果Handler的mAsynchronous为true，则通过该Handler发送的消息默认都是异步；反之，默认都是同步。除此以外，我们也可以通过消息的setAsynchronous方法来单独地给某个方法设置是否异步。</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/java/android/os/Message.java#447" target="_blank" rel="noopener">/frameworks/base/core/java/android/os/Message.java</a></p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">447</span>    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">boolean</span> <span class="hljs-title">isAsynchronous</span><span class="hljs-params">()</span> </span>&#123;</span><br><span class="line"><span class="hljs-number">448</span>        <span class="hljs-keyword">return</span> (flags &amp; FLAG_ASYNCHRONOUS) != <span class="hljs-number">0</span>;</span><br><span class="line"><span class="hljs-number">449</span>    &#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">477</span>    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title">setAsynchronous</span><span class="hljs-params">(<span class="hljs-keyword">boolean</span> async)</span> </span>&#123;</span><br><span class="line"><span class="hljs-number">478</span>        <span class="hljs-keyword">if</span> (async) &#123;</span><br><span class="line"><span class="hljs-number">479</span>            flags |= FLAG_ASYNCHRONOUS;</span><br><span class="line"><span class="hljs-number">480</span>        &#125; <span class="hljs-keyword">else</span> &#123;</span><br><span class="line"><span class="hljs-number">481</span>            flags &amp;= ~FLAG_ASYNCHRONOUS;</span><br><span class="line"><span class="hljs-number">482</span>        &#125;</span><br><span class="line"><span class="hljs-number">483</span>    &#125;</span><br></pre></td></tr></table></figure>
+
+<p>回到新消息插入到链表中间（或尾部）时needWake的赋值，needWake在遍历之初被赋值如下：</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/java/android/os/MessageQueue.java#566" target="_blank" rel="noopener">/frameworks/base/core/java/android/os/MessageQueue.java</a></p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">566</span>                needWake = mBlocked &amp;&amp; p.target == <span class="hljs-keyword">null</span> &amp;&amp; msg.isAsynchronous();</span><br></pre></td></tr></table></figure>
+
+<p>只有当MessageQueue所在的线程阻塞，链表头部为同步屏障，且新消息为异步消息时，needWake才为true。三者缺一不可。</p>
+<ol>
+<li>mBlocked为false，表明线程未阻塞，自然不需要唤醒。</li>
+<li>p.target != null，表明头部消息有效，此时即便mBlocked为true，这时候的阻塞也是有超时的，超时时间到达后，线程自动唤醒，无需外部唤醒。</li>
+<li>msg.isAsynchronous() = false，表明新消息为同步消息，此时若头部消息为同步屏障，则新消息也无法被放行，唤醒线程也没用，干脆不唤醒。</li>
+</ol>
+<p>另外在遍历的过程中，如果发现新消息的前面有另一个消息为异步消息，则needWake重新置为false。这种情况表明原有的异步消息为线程设置了有超时的阻塞，当下时间未达到异步消息的发送时间，所以mBlocked为true。但由于此次阻塞设有超时，所以并不需要外不唤醒。</p>
+<p>线程的阻塞相当于人类的睡眠，从阻塞状态中恢复有两种可能，一种是超时唤醒，另一个是外部唤醒。类比到人类的睡眠，人从睡梦中被叫醒也有两种可能，一种是自己定闹钟，闹钟响后将自己叫醒，另一种是被别人拍醒（不考虑自然醒，因为自然醒本质也是闹钟叫醒，只不过这个闹钟是生物钟）。</p>
+<h4 id="2-2-4-如何主动唤醒线程？"><a href="#2-2-4-如何主动唤醒线程？" class="headerlink" title="2.2.4 如何主动唤醒线程？"></a><strong>2.2.4 如何主动唤醒线程？</strong></h4><p>上面介绍了是否应该主动唤醒线程，如果回答“需要”的话，那我们又该怎样去唤醒线程呢？</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/java/android/os/MessageQueue.java#584" target="_blank" rel="noopener">/frameworks/base/core/java/android/os/MessageQueue.java</a></p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">584</span>                nativeWake(mPtr);</span><br></pre></td></tr></table></figure>
+
+<p>通过nativeWake的native方法，我们就可以实现唤醒MessageQueue所在线程的目的。它对应的JNI方法是android_os_MessageQueue_nativeWake。传入的mPtr实际上是native对象的指针，它被存在一个Java的字段中，用于Java层和native层的互动。</p>
+<p>mPtr被转换成NativeMessageQueue对象(c++对象)的指针，紧接着调用NativeMessageQueue对象的wake方法。</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/jni/android_os_MessageQueue.cpp#194" target="_blank" rel="noopener">/frameworks/base/core/jni/android_os_MessageQueue.cpp</a></p>
+<figure class="highlight c++ hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">194</span><span class="hljs-function"><span class="hljs-keyword">static</span> <span class="hljs-keyword">void</span> <span class="hljs-title">android_os_MessageQueue_nativeWake</span><span class="hljs-params">(JNIEnv* env, jclass clazz, jlong ptr)</span> </span>&#123;</span><br><span class="line"><span class="hljs-number">195</span>    NativeMessageQueue* nativeMessageQueue = <span class="hljs-keyword">reinterpret_cast</span>&lt;NativeMessageQueue*&gt;(ptr);</span><br><span class="line"><span class="hljs-number">196</span>    nativeMessageQueue-&gt;wake();</span><br><span class="line"><span class="hljs-number">197</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<p>再追踪下去，发现调用的是NativeMessageQueue中mLooper变量的wake方法。最终只干了一件事：往native层的Looper对象的mWakeEventFd中写一个“1”。结合2.1中对Epoll机制的描述，mWakeEventFd上有可读数据时，epfd将会监测到该事件，并将线程从挂起状态恢复为运行状态。</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/jni/android_os_MessageQueue.cpp#121" target="_blank" rel="noopener">/frameworks/base/core/jni/android_os_MessageQueue.cpp</a></p>
+<figure class="highlight c++ hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">121</span><span class="hljs-keyword">void</span> NativeMessageQueue::wake() &#123;</span><br><span class="line"><span class="hljs-number">122</span>    mLooper-&gt;wake();</span><br><span class="line"><span class="hljs-number">123</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<p><a href="http://androidxref.com/9.0.0_r3/xref/system/core/libutils/Looper.cpp#398" target="_blank" rel="noopener">/system/core/libutils/Looper.cpp</a></p>
+<figure class="highlight c++ hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">398</span><span class="hljs-keyword">void</span> Looper::wake() &#123;</span><br><span class="line"><span class="hljs-number">399</span><span class="hljs-meta">#<span class="hljs-meta-keyword">if</span> DEBUG_POLL_AND_WAKE</span></span><br><span class="line"><span class="hljs-number">400</span>    ALOGD(<span class="hljs-string">"%p ~ wake"</span>, <span class="hljs-keyword">this</span>);</span><br><span class="line"><span class="hljs-number">401</span><span class="hljs-meta">#<span class="hljs-meta-keyword">endif</span></span></span><br><span class="line"><span class="hljs-number">402</span></span><br><span class="line"><span class="hljs-number">403</span>    <span class="hljs-keyword">uint64_t</span> inc = <span class="hljs-number">1</span>;</span><br><span class="line"><span class="hljs-number">404</span>    <span class="hljs-keyword">ssize_t</span> nWrite = TEMP_FAILURE_RETRY(write(mWakeEventFd, &amp;inc, <span class="hljs-keyword">sizeof</span>(<span class="hljs-keyword">uint64_t</span>)));</span><br><span class="line"><span class="hljs-number">405</span>    <span class="hljs-keyword">if</span> (nWrite != <span class="hljs-keyword">sizeof</span>(<span class="hljs-keyword">uint64_t</span>)) &#123;</span><br><span class="line"><span class="hljs-number">406</span>        <span class="hljs-keyword">if</span> (errno != EAGAIN) &#123;</span><br><span class="line"><span class="hljs-number">407</span>            LOG_ALWAYS_FATAL(<span class="hljs-string">"Could not write wake signal to fd %d: %s"</span>,</span><br><span class="line"><span class="hljs-number">408</span>                    mWakeEventFd, strerror(errno));</span><br><span class="line"><span class="hljs-number">409</span>        &#125;</span><br><span class="line"><span class="hljs-number">410</span>    &#125;</span><br><span class="line"><span class="hljs-number">411</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-3-消息处理过程"><a href="#2-3-消息处理过程" class="headerlink" title="2.3 消息处理过程"></a><strong>2.3 消息处理过程</strong></h3><p>对于想要运行消息机制的线程而言，除了需要通过Looper.prepare来创建属于自己的Looper和MessageQueue，还需要调用Looper.loop来真正的轮询、处理消息。</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/java/android/os/Looper.java#137" target="_blank" rel="noopener">/frameworks/base/core/java/android/os/Looper.java</a></p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">127</span>    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">static</span> Looper <span class="hljs-title">getMainLooper</span><span class="hljs-params">()</span> </span>&#123;</span><br><span class="line"><span class="hljs-number">128</span>        <span class="hljs-keyword">synchronized</span> (Looper.class) &#123;</span><br><span class="line"><span class="hljs-number">129</span>            <span class="hljs-keyword">return</span> sMainLooper;</span><br><span class="line"><span class="hljs-number">130</span>        &#125;</span><br><span class="line"><span class="hljs-number">131</span>    &#125;</span><br><span class="line"><span class="hljs-number">132</span></span><br><span class="line"><span class="hljs-number">133</span>    <span class="hljs-comment">/**</span></span><br><span class="line"><span class="hljs-comment">134     * Run the message queue in this thread. Be sure to call</span></span><br><span class="line"><span class="hljs-comment">135     * &#123;<span class="hljs-doctag">@link</span> #quit()&#125; to end the loop.</span></span><br><span class="line"><span class="hljs-comment">136     */</span></span><br><span class="line"><span class="hljs-number">137</span>    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">static</span> <span class="hljs-keyword">void</span> <span class="hljs-title">loop</span><span class="hljs-params">()</span> </span>&#123;</span><br><span class="line"><span class="hljs-number">138</span>        <span class="hljs-keyword">final</span> Looper me = myLooper();</span><br><span class="line"><span class="hljs-number">139</span>        <span class="hljs-keyword">if</span> (me == <span class="hljs-keyword">null</span>) &#123;</span><br><span class="line"><span class="hljs-number">140</span>            <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> RuntimeException(<span class="hljs-string">"No Looper; Looper.prepare() wasn't called on this thread."</span>);</span><br><span class="line"><span class="hljs-number">141</span>        &#125;</span><br><span class="line"><span class="hljs-number">142</span>        <span class="hljs-keyword">final</span> MessageQueue queue = me.mQueue;</span><br><span class="line"><span class="hljs-number">143</span></span><br><span class="line"><span class="hljs-number">144</span>        <span class="hljs-comment">// Make sure the identity of this thread is that of the local process,</span></span><br><span class="line"><span class="hljs-number">145</span>        <span class="hljs-comment">// and keep track of what that identity token actually is.</span></span><br><span class="line"><span class="hljs-number">146</span>        Binder.clearCallingIdentity();</span><br><span class="line"><span class="hljs-number">147</span>        <span class="hljs-keyword">final</span> <span class="hljs-keyword">long</span> ident = Binder.clearCallingIdentity();</span><br><span class="line"><span class="hljs-number">148</span></span><br><span class="line"><span class="hljs-number">149</span>        <span class="hljs-comment">// Allow overriding a threshold with a system prop. e.g.</span></span><br><span class="line"><span class="hljs-number">150</span>        <span class="hljs-comment">// adb shell 'setprop log.looper.1000.main.slow 1 &amp;&amp; stop &amp;&amp; start'</span></span><br><span class="line"><span class="hljs-number">151</span>        <span class="hljs-keyword">final</span> <span class="hljs-keyword">int</span> thresholdOverride =</span><br><span class="line"><span class="hljs-number">152</span>                SystemProperties.getInt(<span class="hljs-string">"log.looper."</span></span><br><span class="line"><span class="hljs-number">153</span>                        + Process.myUid() + <span class="hljs-string">"."</span></span><br><span class="line"><span class="hljs-number">154</span>                        + Thread.currentThread().getName()</span><br><span class="line"><span class="hljs-number">155</span>                        + <span class="hljs-string">".slow"</span>, <span class="hljs-number">0</span>);</span><br><span class="line"><span class="hljs-number">156</span></span><br><span class="line"><span class="hljs-number">157</span>        <span class="hljs-keyword">boolean</span> slowDeliveryDetected = <span class="hljs-keyword">false</span>;</span><br><span class="line"><span class="hljs-number">158</span></span><br><span class="line"><span class="hljs-number">159</span>        <span class="hljs-keyword">for</span> (;;) &#123;</span><br><span class="line"><span class="hljs-number">160</span>            Message msg = queue.next(); <span class="hljs-comment">// might block</span></span><br><span class="line"><span class="hljs-number">161</span>            <span class="hljs-keyword">if</span> (msg == <span class="hljs-keyword">null</span>) &#123;</span><br><span class="line"><span class="hljs-number">162</span>                <span class="hljs-comment">// No message indicates that the message queue is quitting.</span></span><br><span class="line"><span class="hljs-number">163</span>                <span class="hljs-keyword">return</span>;</span><br><span class="line"><span class="hljs-number">164</span>            &#125;</span><br><span class="line"><span class="hljs-number">165</span></span><br><span class="line"><span class="hljs-number">166</span>            <span class="hljs-comment">// This must be in a local variable, in case a UI event sets the logger</span></span><br><span class="line"><span class="hljs-number">167</span>            <span class="hljs-keyword">final</span> Printer logging = me.mLogging;</span><br><span class="line"><span class="hljs-number">168</span>            <span class="hljs-keyword">if</span> (logging != <span class="hljs-keyword">null</span>) &#123;</span><br><span class="line"><span class="hljs-number">169</span>                logging.println(<span class="hljs-string">"&gt;&gt;&gt;&gt;&gt; Dispatching to "</span> + msg.target + <span class="hljs-string">" "</span> +</span><br><span class="line"><span class="hljs-number">170</span>                        msg.callback + <span class="hljs-string">": "</span> + msg.what);</span><br><span class="line"><span class="hljs-number">171</span>            &#125;</span><br><span class="line"><span class="hljs-number">172</span></span><br><span class="line"><span class="hljs-number">173</span>            <span class="hljs-keyword">final</span> <span class="hljs-keyword">long</span> traceTag = me.mTraceTag;</span><br><span class="line"><span class="hljs-number">174</span>            <span class="hljs-keyword">long</span> slowDispatchThresholdMs = me.mSlowDispatchThresholdMs;</span><br><span class="line"><span class="hljs-number">175</span>            <span class="hljs-keyword">long</span> slowDeliveryThresholdMs = me.mSlowDeliveryThresholdMs;</span><br><span class="line"><span class="hljs-number">176</span>            <span class="hljs-keyword">if</span> (thresholdOverride &gt; <span class="hljs-number">0</span>) &#123;</span><br><span class="line"><span class="hljs-number">177</span>                slowDispatchThresholdMs = thresholdOverride;</span><br><span class="line"><span class="hljs-number">178</span>                slowDeliveryThresholdMs = thresholdOverride;</span><br><span class="line"><span class="hljs-number">179</span>            &#125;</span><br><span class="line"><span class="hljs-number">180</span>            <span class="hljs-keyword">final</span> <span class="hljs-keyword">boolean</span> logSlowDelivery = (slowDeliveryThresholdMs &gt; <span class="hljs-number">0</span>) &amp;&amp; (msg.when &gt; <span class="hljs-number">0</span>);</span><br><span class="line"><span class="hljs-number">181</span>            <span class="hljs-keyword">final</span> <span class="hljs-keyword">boolean</span> logSlowDispatch = (slowDispatchThresholdMs &gt; <span class="hljs-number">0</span>);</span><br><span class="line"><span class="hljs-number">182</span></span><br><span class="line"><span class="hljs-number">183</span>            <span class="hljs-keyword">final</span> <span class="hljs-keyword">boolean</span> needStartTime = logSlowDelivery || logSlowDispatch;</span><br><span class="line"><span class="hljs-number">184</span>            <span class="hljs-keyword">final</span> <span class="hljs-keyword">boolean</span> needEndTime = logSlowDispatch;</span><br><span class="line"><span class="hljs-number">185</span></span><br><span class="line"><span class="hljs-number">186</span>            <span class="hljs-keyword">if</span> (traceTag != <span class="hljs-number">0</span> &amp;&amp; Trace.isTagEnabled(traceTag)) &#123;</span><br><span class="line"><span class="hljs-number">187</span>                Trace.traceBegin(traceTag, msg.target.getTraceName(msg));</span><br><span class="line"><span class="hljs-number">188</span>            &#125;</span><br><span class="line"><span class="hljs-number">189</span></span><br><span class="line"><span class="hljs-number">190</span>            <span class="hljs-keyword">final</span> <span class="hljs-keyword">long</span> dispatchStart = needStartTime ? SystemClock.uptimeMillis() : <span class="hljs-number">0</span>;</span><br><span class="line"><span class="hljs-number">191</span>            <span class="hljs-keyword">final</span> <span class="hljs-keyword">long</span> dispatchEnd;</span><br><span class="line"><span class="hljs-number">192</span>            <span class="hljs-keyword">try</span> &#123;</span><br><span class="line"><span class="hljs-number">193</span>                msg.target.dispatchMessage(msg);</span><br><span class="line"><span class="hljs-number">194</span>                dispatchEnd = needEndTime ? SystemClock.uptimeMillis() : <span class="hljs-number">0</span>;</span><br><span class="line"><span class="hljs-number">195</span>            &#125; <span class="hljs-keyword">finally</span> &#123;</span><br><span class="line"><span class="hljs-number">196</span>                <span class="hljs-keyword">if</span> (traceTag != <span class="hljs-number">0</span>) &#123;</span><br><span class="line"><span class="hljs-number">197</span>                    Trace.traceEnd(traceTag);</span><br><span class="line"><span class="hljs-number">198</span>                &#125;</span><br><span class="line"><span class="hljs-number">199</span>            &#125;</span><br><span class="line"><span class="hljs-number">200</span>            <span class="hljs-keyword">if</span> (logSlowDelivery) &#123;</span><br><span class="line"><span class="hljs-number">201</span>                <span class="hljs-keyword">if</span> (slowDeliveryDetected) &#123;</span><br><span class="line"><span class="hljs-number">202</span>                    <span class="hljs-keyword">if</span> ((dispatchStart - msg.when) &lt;= <span class="hljs-number">10</span>) &#123;</span><br><span class="line"><span class="hljs-number">203</span>                        Slog.w(TAG, <span class="hljs-string">"Drained"</span>);</span><br><span class="line"><span class="hljs-number">204</span>                        slowDeliveryDetected = <span class="hljs-keyword">false</span>;</span><br><span class="line"><span class="hljs-number">205</span>                    &#125;</span><br><span class="line"><span class="hljs-number">206</span>                &#125; <span class="hljs-keyword">else</span> &#123;</span><br><span class="line"><span class="hljs-number">207</span>                    <span class="hljs-keyword">if</span> (showSlowLog(slowDeliveryThresholdMs, msg.when, dispatchStart, <span class="hljs-string">"delivery"</span>,</span><br><span class="line"><span class="hljs-number">208</span>                            msg)) &#123;</span><br><span class="line"><span class="hljs-number">209</span>                        <span class="hljs-comment">// Once we write a slow delivery log, suppress until the queue drains.</span></span><br><span class="line"><span class="hljs-number">210</span>                        slowDeliveryDetected = <span class="hljs-keyword">true</span>;</span><br><span class="line"><span class="hljs-number">211</span>                    &#125;</span><br><span class="line"><span class="hljs-number">212</span>                &#125;</span><br><span class="line"><span class="hljs-number">213</span>            &#125;</span><br><span class="line"><span class="hljs-number">214</span>            <span class="hljs-keyword">if</span> (logSlowDispatch) &#123;</span><br><span class="line"><span class="hljs-number">215</span>                showSlowLog(slowDispatchThresholdMs, dispatchStart, dispatchEnd, <span class="hljs-string">"dispatch"</span>, msg);</span><br><span class="line"><span class="hljs-number">216</span>            &#125;</span><br><span class="line"><span class="hljs-number">217</span></span><br><span class="line"><span class="hljs-number">218</span>            <span class="hljs-keyword">if</span> (logging != <span class="hljs-keyword">null</span>) &#123;</span><br><span class="line"><span class="hljs-number">219</span>                logging.println(<span class="hljs-string">"&lt;&lt;&lt;&lt;&lt; Finished to "</span> + msg.target + <span class="hljs-string">" "</span> + msg.callback);</span><br><span class="line"><span class="hljs-number">220</span>            &#125;</span><br><span class="line"><span class="hljs-number">221</span></span><br><span class="line"><span class="hljs-number">222</span>            <span class="hljs-comment">// Make sure that during the course of dispatching the</span></span><br><span class="line"><span class="hljs-number">223</span>            <span class="hljs-comment">// identity of the thread wasn't corrupted.</span></span><br><span class="line"><span class="hljs-number">224</span>            <span class="hljs-keyword">final</span> <span class="hljs-keyword">long</span> newIdent = Binder.clearCallingIdentity();</span><br><span class="line"><span class="hljs-number">225</span>            <span class="hljs-keyword">if</span> (ident != newIdent) &#123;</span><br><span class="line"><span class="hljs-number">226</span>                Log.wtf(TAG, <span class="hljs-string">"Thread identity changed from 0x"</span></span><br><span class="line"><span class="hljs-number">227</span>                        + Long.toHexString(ident) + <span class="hljs-string">" to 0x"</span></span><br><span class="line"><span class="hljs-number">228</span>                        + Long.toHexString(newIdent) + <span class="hljs-string">" while dispatching to "</span></span><br><span class="line"><span class="hljs-number">229</span>                        + msg.target.getClass().getName() + <span class="hljs-string">" "</span></span><br><span class="line"><span class="hljs-number">230</span>                        + msg.callback + <span class="hljs-string">" what="</span> + msg.what);</span><br><span class="line"><span class="hljs-number">231</span>            &#125;</span><br><span class="line"><span class="hljs-number">232</span></span><br><span class="line"><span class="hljs-number">233</span>            msg.recycleUnchecked();</span><br><span class="line"><span class="hljs-number">234</span>        &#125;</span><br><span class="line"><span class="hljs-number">235</span>    &#125;</span><br></pre></td></tr></table></figure>
+
+<p>159行开始的for循环在正常状态下永远不会退出，除非调用Looper或MessageQueue的quit方法。在每一次循环的过程中，都做了以下三件事：</p>
+<ol>
+<li>取出消息链表中可被处理的头部消息。</li>
+<li>执行消息所对应的Handler的dispatchMessage方法，并记录消息处理的delivery时间和dispatch时间，用于监测消息队列的运转状态是否正常。</li>
+<li>回收此消息。</li>
+</ol>
+<p>在这三个步骤中，需要详细分析的是1和2。1需要较多的篇幅来阐述，因此我们先分析2的过程。</p>
+<h4 id="2-3-1-Delievery-Time和Dispatch-Time分别指的是什么？"><a href="#2-3-1-Delievery-Time和Dispatch-Time分别指的是什么？" class="headerlink" title="2.3.1 Delievery Time和Dispatch Time分别指的是什么？"></a><strong>2.3.1 Delievery Time和Dispatch Time分别指的是什么？</strong></h4><p><strong>Delievery Time:</strong></p>
+<p><img src="https://raw.githubusercontent.com/banshann/Picbed/master/DelieveryTime.jpg" alt="Delievery Time示意图"></p>
+<p>待发送的消息通常都有一个预设的发送时间点，也即message的when字段。当这个消息从消息链表中被取出时，记录另一个时间点，称之为dispatchStart。正常情况下，dispatchStart和msg.when相同，表明消息按照预设的时间点被取出。非正常情况下，如果前面消息处理时间过长，将会延误后续消息的发送（因为消息链表是串行发送的）。这个道理和排队的情形很相似。</p>
+<p>DelieveryTime = dispatchStart - msg.when，表示消息被取出的时间点和预设的时间点之间的差距。差值较小，表明消息基本是按照预设的时间来取出的。差值较大，则表明消息队列有些拥堵，可能是前面的消息过多，也可能是前面某个消息的处理耗时过长。总之，当前这个消息并没有按照预设的时间被取出，而是有些滞后了。</p>
+<p><strong>Dispatch Time:</strong></p>
+<p>消息的处理时间，也即消息所对应Handler的dispatchMessage方法的运行时间。每个消息都有属于自己的处理方法，其中可能包含某些耗时操作。因此记录下dispatch time，当这个时间超过某个阈值时给出相应的警告，可以帮助开发者了解程序的性能以及运行时的压力。</p>
+<h4 id="2-3-2-消息处理最终执行哪个方法？"><a href="#2-3-2-消息处理最终执行哪个方法？" class="headerlink" title="2.3.2 消息处理最终执行哪个方法？"></a><strong>2.3.2 消息处理最终执行哪个方法？</strong></h4><p>消息处理会调用Handler的dispatchMessage方法来对消息进行处理。在这个方法内部，我们可以看出一个消息会有三种处理方式。三种处理方式并非随机选择，而是具有一定的优先级的。</p>
+<ol>
+<li>当message本身的callback字段不为空时，按照callback指定的方式对消息进行处理。</li>
+<li>当条件1不满足，且Handler对象的mCallback字段不为空时，按照mCallback指定的方式对消息进行处理。</li>
+<li>当条件1、2均不满足时，按照Handler类的handleMessage方法对消息进行处理。</li>
+</ol>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/java/android/os/Handler.java#97" target="_blank" rel="noopener">/frameworks/base/core/java/android/os/Handler.java</a></p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">97</span>    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title">dispatchMessage</span><span class="hljs-params">(Message msg)</span> </span>&#123;</span><br><span class="line"><span class="hljs-number">98</span>        <span class="hljs-keyword">if</span> (msg.callback != <span class="hljs-keyword">null</span>) &#123;</span><br><span class="line"><span class="hljs-number">99</span>            handleCallback(msg);</span><br><span class="line"><span class="hljs-number">100</span>        &#125; <span class="hljs-keyword">else</span> &#123;</span><br><span class="line"><span class="hljs-number">101</span>            <span class="hljs-keyword">if</span> (mCallback != <span class="hljs-keyword">null</span>) &#123;</span><br><span class="line"><span class="hljs-number">102</span>                <span class="hljs-keyword">if</span> (mCallback.handleMessage(msg)) &#123;</span><br><span class="line"><span class="hljs-number">103</span>                    <span class="hljs-keyword">return</span>;</span><br><span class="line"><span class="hljs-number">104</span>                &#125;</span><br><span class="line"><span class="hljs-number">105</span>            &#125;</span><br><span class="line"><span class="hljs-number">106</span>            handleMessage(msg);</span><br><span class="line"><span class="hljs-number">107</span>        &#125;</span><br><span class="line"><span class="hljs-number">108</span>    &#125;</span><br></pre></td></tr></table></figure>
+
+<p>以下分别列举满足3种处理方式的例子：</p>
+<ol>
+<li>当message本身的callback字段不为空时，按照callback指定的方式对消息进行处理。</li>
+</ol>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/java/android/speech/tts/TextToSpeechService.java#579" target="_blank" rel="noopener">/frameworks/base/core/java/android/speech/tts/TextToSpeechService.java</a></p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">579</span>            Runnable runnable = <span class="hljs-keyword">new</span> Runnable() &#123;</span><br><span class="line"><span class="hljs-number">580</span>                <span class="hljs-meta">@Override</span></span><br><span class="line"><span class="hljs-number">581</span>                <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title">run</span><span class="hljs-params">()</span> </span>&#123;</span><br><span class="line"><span class="hljs-number">582</span>                    <span class="hljs-keyword">if</span> (setCurrentSpeechItem(speechItem)) &#123;</span><br><span class="line"><span class="hljs-number">583</span>                        speechItem.play();</span><br><span class="line"><span class="hljs-number">584</span>                        removeCurrentSpeechItem();</span><br><span class="line"><span class="hljs-number">585</span>                    &#125; <span class="hljs-keyword">else</span> &#123;</span><br><span class="line"><span class="hljs-number">586</span>                        <span class="hljs-comment">// The item is alreadly flushed. Stopping.</span></span><br><span class="line"><span class="hljs-number">587</span>                        speechItem.stop();</span><br><span class="line"><span class="hljs-number">588</span>                    &#125;</span><br><span class="line"><span class="hljs-number">589</span>                &#125;</span><br><span class="line"><span class="hljs-number">590</span>            &#125;;</span><br><span class="line"><span class="hljs-number">591</span>            Message msg = Message.obtain(<span class="hljs-keyword">this</span>, runnable);</span><br></pre></td></tr></table></figure>
+
+<ol start="2">
+<li>当条件1不满足，且Handler对象的mCallback字段不为空时，按照mCallback指定的方式对消息进行处理。</li>
+</ol>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/services/core/java/com/android/server/GraphicsStatsService.java#110" target="_blank" rel="noopener">/frameworks/base/services/core/java/com/android/server/GraphicsStatsService.java</a></p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">110</span>        mWriteOutHandler = <span class="hljs-keyword">new</span> Handler(bgthread.getLooper(), <span class="hljs-keyword">new</span> Handler.Callback() &#123;</span><br><span class="line"><span class="hljs-number">111</span>            <span class="hljs-meta">@Override</span></span><br><span class="line"><span class="hljs-number">112</span>            <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">boolean</span> <span class="hljs-title">handleMessage</span><span class="hljs-params">(Message msg)</span> </span>&#123;</span><br><span class="line"><span class="hljs-number">113</span>                <span class="hljs-keyword">switch</span> (msg.what) &#123;</span><br><span class="line"><span class="hljs-number">114</span>                    <span class="hljs-keyword">case</span> SAVE_BUFFER:</span><br><span class="line"><span class="hljs-number">115</span>                        saveBuffer((HistoricalBuffer) msg.obj);</span><br><span class="line"><span class="hljs-number">116</span>                        <span class="hljs-keyword">break</span>;</span><br><span class="line"><span class="hljs-number">117</span>                    <span class="hljs-keyword">case</span> DELETE_OLD:</span><br><span class="line"><span class="hljs-number">118</span>                        deleteOldBuffers();</span><br><span class="line"><span class="hljs-number">119</span>                        <span class="hljs-keyword">break</span>;</span><br><span class="line"><span class="hljs-number">120</span>                &#125;</span><br><span class="line"><span class="hljs-number">121</span>                <span class="hljs-keyword">return</span> <span class="hljs-keyword">true</span>;</span><br><span class="line"><span class="hljs-number">122</span>            &#125;</span><br><span class="line"><span class="hljs-number">123</span>        &#125;);</span><br></pre></td></tr></table></figure>
+
+<ol start="3">
+<li>当条件1、2均不满足时，按照Handler类的handleMessage方法对消息进行处理。</li>
+</ol>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/services/core/java/com/android/server/pm/ProcessLoggingHandler.java#48" target="_blank" rel="noopener">/frameworks/base/services/core/java/com/android/server/pm/ProcessLoggingHandler.java</a></p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">35</span><span class="hljs-keyword">public</span> <span class="hljs-keyword">final</span> <span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">ProcessLoggingHandler</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Handler</span> </span>&#123;</span><br><span class="line">......</span><br><span class="line">......</span><br><span class="line"><span class="hljs-number">47</span>    <span class="hljs-meta">@Override</span></span><br><span class="line"><span class="hljs-number">48</span>    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title">handleMessage</span><span class="hljs-params">(Message msg)</span> </span>&#123;</span><br><span class="line"><span class="hljs-number">49</span>        <span class="hljs-keyword">switch</span> (msg.what) &#123;</span><br><span class="line"><span class="hljs-number">50</span>            <span class="hljs-keyword">case</span> LOG_APP_PROCESS_START_MSG: &#123;</span><br><span class="line"><span class="hljs-number">51</span>                Bundle bundle = msg.getData();</span><br><span class="line"><span class="hljs-number">52</span>                String processName = bundle.getString(<span class="hljs-string">"processName"</span>);</span><br><span class="line"><span class="hljs-number">53</span>                <span class="hljs-keyword">int</span> uid = bundle.getInt(<span class="hljs-string">"uid"</span>);</span><br><span class="line"><span class="hljs-number">54</span>                String seinfo = bundle.getString(<span class="hljs-string">"seinfo"</span>);</span><br><span class="line"><span class="hljs-number">55</span>                String apkFile = bundle.getString(<span class="hljs-string">"apkFile"</span>);</span><br><span class="line"><span class="hljs-number">56</span>                <span class="hljs-keyword">int</span> pid = bundle.getInt(<span class="hljs-string">"pid"</span>);</span><br><span class="line"><span class="hljs-number">57</span>                <span class="hljs-keyword">long</span> startTimestamp = bundle.getLong(<span class="hljs-string">"startTimestamp"</span>);</span><br><span class="line"><span class="hljs-number">58</span>                String apkHash = computeStringHashOfApk(apkFile);</span><br><span class="line"><span class="hljs-number">59</span>                SecurityLog.writeEvent(SecurityLog.TAG_APP_PROCESS_START, processName,</span><br><span class="line"><span class="hljs-number">60</span>                        startTimestamp, uid, pid, seinfo, apkHash);</span><br><span class="line"><span class="hljs-number">61</span>                <span class="hljs-keyword">break</span>;</span><br><span class="line"><span class="hljs-number">62</span>            &#125;</span><br><span class="line"><span class="hljs-number">63</span>            <span class="hljs-keyword">case</span> INVALIDATE_BASE_APK_HASH_MSG: &#123;</span><br><span class="line"><span class="hljs-number">64</span>                Bundle bundle = msg.getData();</span><br><span class="line"><span class="hljs-number">65</span>                mProcessLoggingBaseApkHashes.remove(bundle.getString(<span class="hljs-string">"apkFile"</span>));</span><br><span class="line"><span class="hljs-number">66</span>                <span class="hljs-keyword">break</span>;</span><br><span class="line"><span class="hljs-number">67</span>            &#125;</span><br><span class="line"><span class="hljs-number">68</span>        &#125;</span><br><span class="line"><span class="hljs-number">69</span>    &#125;</span><br></pre></td></tr></table></figure>
+
+<p>开发者定义的都是Handler的子类（譬如上面的ProcessingLoggingHandler），如果需要最终由Handler类的handleMessage来对消息进行处理，则子类中必须覆盖父类的handleMessage方法。否则将不会对消息进行处理，因为父类（Handler）的handleMessage方法是一个空方法。</p>
+<p>这种阶梯式处理消息的设计，可以给予开发者更大的自由度。</p>
+<h4 id="2-3-3-如何取出下一个消息？"><a href="#2-3-3-如何取出下一个消息？" class="headerlink" title="2.3.3 如何取出下一个消息？"></a><strong>2.3.3 如何取出下一个消息？</strong></h4><p>接下来重点讲述如何取出消息链表中可被处理的头部消息。让我们走进MessageQueue的next方法。</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/java/android/os/Looper.java#160" target="_blank" rel="noopener">/frameworks/base/core/java/android/os/Looper.java</a></p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">160</span>            Message msg = queue.next(); <span class="hljs-comment">// might block</span></span><br></pre></td></tr></table></figure>
+
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/java/android/os/MessageQueue.java#310" target="_blank" rel="noopener">/frameworks/base/core/java/android/os/MessageQueue.java</a></p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">310</span>    <span class="hljs-function">Message <span class="hljs-title">next</span><span class="hljs-params">()</span> </span>&#123;</span><br><span class="line"><span class="hljs-number">311</span>        <span class="hljs-comment">// Return here if the message loop has already quit and been disposed.</span></span><br><span class="line"><span class="hljs-number">312</span>        <span class="hljs-comment">// This can happen if the application tries to restart a looper after quit</span></span><br><span class="line"><span class="hljs-number">313</span>        <span class="hljs-comment">// which is not supported.</span></span><br><span class="line"><span class="hljs-number">314</span>        <span class="hljs-keyword">final</span> <span class="hljs-keyword">long</span> ptr = mPtr;</span><br><span class="line"><span class="hljs-number">315</span>        <span class="hljs-keyword">if</span> (ptr == <span class="hljs-number">0</span>) &#123;</span><br><span class="line"><span class="hljs-number">316</span>            <span class="hljs-keyword">return</span> <span class="hljs-keyword">null</span>;</span><br><span class="line"><span class="hljs-number">317</span>        &#125;</span><br><span class="line"><span class="hljs-number">318</span></span><br><span class="line"><span class="hljs-number">319</span>        <span class="hljs-keyword">int</span> pendingIdleHandlerCount = -<span class="hljs-number">1</span>; <span class="hljs-comment">// -1 only during first iteration</span></span><br><span class="line"><span class="hljs-number">320</span>        <span class="hljs-keyword">int</span> nextPollTimeoutMillis = <span class="hljs-number">0</span>;</span><br><span class="line"><span class="hljs-number">321</span>        <span class="hljs-keyword">for</span> (;;) &#123;</span><br><span class="line"><span class="hljs-number">322</span>            <span class="hljs-keyword">if</span> (nextPollTimeoutMillis != <span class="hljs-number">0</span>) &#123;</span><br><span class="line"><span class="hljs-number">323</span>                Binder.flushPendingCommands();</span><br><span class="line"><span class="hljs-number">324</span>            &#125;</span><br><span class="line"><span class="hljs-number">325</span></span><br><span class="line"><span class="hljs-number">326</span>            nativePollOnce(ptr, nextPollTimeoutMillis);</span><br><span class="line"><span class="hljs-number">327</span></span><br><span class="line"><span class="hljs-number">328</span>            <span class="hljs-keyword">synchronized</span> (<span class="hljs-keyword">this</span>) &#123;</span><br><span class="line"><span class="hljs-number">329</span>                <span class="hljs-comment">// Try to retrieve the next message.  Return if found.</span></span><br><span class="line"><span class="hljs-number">330</span>                <span class="hljs-keyword">final</span> <span class="hljs-keyword">long</span> now = SystemClock.uptimeMillis();</span><br><span class="line"><span class="hljs-number">331</span>                Message prevMsg = <span class="hljs-keyword">null</span>;</span><br><span class="line"><span class="hljs-number">332</span>                Message msg = mMessages;</span><br><span class="line"><span class="hljs-number">333</span>                <span class="hljs-keyword">if</span> (msg != <span class="hljs-keyword">null</span> &amp;&amp; msg.target == <span class="hljs-keyword">null</span>) &#123;</span><br><span class="line"><span class="hljs-number">334</span>                    <span class="hljs-comment">// Stalled by a barrier.  Find the next asynchronous message in the queue.</span></span><br><span class="line"><span class="hljs-number">335</span>                    <span class="hljs-keyword">do</span> &#123;</span><br><span class="line"><span class="hljs-number">336</span>                        prevMsg = msg;</span><br><span class="line"><span class="hljs-number">337</span>                        msg = msg.next;</span><br><span class="line"><span class="hljs-number">338</span>                    &#125; <span class="hljs-keyword">while</span> (msg != <span class="hljs-keyword">null</span> &amp;&amp; !msg.isAsynchronous());</span><br><span class="line"><span class="hljs-number">339</span>                &#125;</span><br><span class="line"><span class="hljs-number">340</span>                <span class="hljs-keyword">if</span> (msg != <span class="hljs-keyword">null</span>) &#123;</span><br><span class="line"><span class="hljs-number">341</span>                    <span class="hljs-keyword">if</span> (now &lt; msg.when) &#123;</span><br><span class="line"><span class="hljs-number">342</span>                        <span class="hljs-comment">// Next message is not ready.  Set a timeout to wake up when it is ready.</span></span><br><span class="line"><span class="hljs-number">343</span>                        nextPollTimeoutMillis = (<span class="hljs-keyword">int</span>) Math.min(msg.when - now, Integer.MAX_VALUE);</span><br><span class="line"><span class="hljs-number">344</span>                    &#125; <span class="hljs-keyword">else</span> &#123;</span><br><span class="line"><span class="hljs-number">345</span>                        <span class="hljs-comment">// Got a message.</span></span><br><span class="line"><span class="hljs-number">346</span>                        mBlocked = <span class="hljs-keyword">false</span>;</span><br><span class="line"><span class="hljs-number">347</span>                        <span class="hljs-keyword">if</span> (prevMsg != <span class="hljs-keyword">null</span>) &#123;</span><br><span class="line"><span class="hljs-number">348</span>                            prevMsg.next = msg.next;</span><br><span class="line"><span class="hljs-number">349</span>                        &#125; <span class="hljs-keyword">else</span> &#123;</span><br><span class="line"><span class="hljs-number">350</span>                            mMessages = msg.next;</span><br><span class="line"><span class="hljs-number">351</span>                        &#125;</span><br><span class="line"><span class="hljs-number">352</span>                        msg.next = <span class="hljs-keyword">null</span>;</span><br><span class="line"><span class="hljs-number">353</span>                        <span class="hljs-keyword">if</span> (DEBUG) Log.v(TAG, <span class="hljs-string">"Returning message: "</span> + msg);</span><br><span class="line"><span class="hljs-number">354</span>                        msg.markInUse();</span><br><span class="line"><span class="hljs-number">355</span>                        <span class="hljs-keyword">return</span> msg;</span><br><span class="line"><span class="hljs-number">356</span>                    &#125;</span><br><span class="line"><span class="hljs-number">357</span>                &#125; <span class="hljs-keyword">else</span> &#123;</span><br><span class="line"><span class="hljs-number">358</span>                    <span class="hljs-comment">// No more messages.</span></span><br><span class="line"><span class="hljs-number">359</span>                    nextPollTimeoutMillis = -<span class="hljs-number">1</span>;</span><br><span class="line"><span class="hljs-number">360</span>                &#125;</span><br><span class="line"><span class="hljs-number">361</span></span><br><span class="line"><span class="hljs-number">362</span>                <span class="hljs-comment">// Process the quit message now that all pending messages have been handled.</span></span><br><span class="line"><span class="hljs-number">363</span>                <span class="hljs-keyword">if</span> (mQuitting) &#123;</span><br><span class="line"><span class="hljs-number">364</span>                    dispose();</span><br><span class="line"><span class="hljs-number">365</span>                    <span class="hljs-keyword">return</span> <span class="hljs-keyword">null</span>;</span><br><span class="line"><span class="hljs-number">366</span>                &#125;</span><br><span class="line"><span class="hljs-number">367</span></span><br><span class="line"><span class="hljs-number">368</span>                <span class="hljs-comment">// If first time idle, then get the number of idlers to run.</span></span><br><span class="line"><span class="hljs-number">369</span>                <span class="hljs-comment">// Idle handles only run if the queue is empty or if the first message</span></span><br><span class="line"><span class="hljs-number">370</span>                <span class="hljs-comment">// in the queue (possibly a barrier) is due to be handled in the future.</span></span><br><span class="line"><span class="hljs-number">371</span>                <span class="hljs-keyword">if</span> (pendingIdleHandlerCount &lt; <span class="hljs-number">0</span></span><br><span class="line"><span class="hljs-number">372</span>                        &amp;&amp; (mMessages == <span class="hljs-keyword">null</span> || now &lt; mMessages.when)) &#123;</span><br><span class="line"><span class="hljs-number">373</span>                    pendingIdleHandlerCount = mIdleHandlers.size();</span><br><span class="line"><span class="hljs-number">374</span>                &#125;</span><br><span class="line"><span class="hljs-number">375</span>                <span class="hljs-keyword">if</span> (pendingIdleHandlerCount &lt;= <span class="hljs-number">0</span>) &#123;</span><br><span class="line"><span class="hljs-number">376</span>                    <span class="hljs-comment">// No idle handlers to run.  Loop and wait some more.</span></span><br><span class="line"><span class="hljs-number">377</span>                    mBlocked = <span class="hljs-keyword">true</span>;</span><br><span class="line"><span class="hljs-number">378</span>                    <span class="hljs-keyword">continue</span>;</span><br><span class="line"><span class="hljs-number">379</span>                &#125;</span><br><span class="line"><span class="hljs-number">380</span></span><br><span class="line"><span class="hljs-number">381</span>                <span class="hljs-keyword">if</span> (mPendingIdleHandlers == <span class="hljs-keyword">null</span>) &#123;</span><br><span class="line"><span class="hljs-number">382</span>                    mPendingIdleHandlers = <span class="hljs-keyword">new</span> IdleHandler[Math.max(pendingIdleHandlerCount, <span class="hljs-number">4</span>)];</span><br><span class="line"><span class="hljs-number">383</span>                &#125;</span><br><span class="line"><span class="hljs-number">384</span>                mPendingIdleHandlers = mIdleHandlers.toArray(mPendingIdleHandlers);</span><br><span class="line"><span class="hljs-number">385</span>            &#125;</span><br><span class="line"><span class="hljs-number">386</span></span><br><span class="line"><span class="hljs-number">387</span>            <span class="hljs-comment">// Run the idle handlers.</span></span><br><span class="line"><span class="hljs-number">388</span>            <span class="hljs-comment">// We only ever reach this code block during the first iteration.</span></span><br><span class="line"><span class="hljs-number">389</span>            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">int</span> i = <span class="hljs-number">0</span>; i &lt; pendingIdleHandlerCount; i++) &#123;</span><br><span class="line"><span class="hljs-number">390</span>                <span class="hljs-keyword">final</span> IdleHandler idler = mPendingIdleHandlers[i];</span><br><span class="line"><span class="hljs-number">391</span>                mPendingIdleHandlers[i] = <span class="hljs-keyword">null</span>; <span class="hljs-comment">// release the reference to the handler</span></span><br><span class="line"><span class="hljs-number">392</span></span><br><span class="line"><span class="hljs-number">393</span>                <span class="hljs-keyword">boolean</span> keep = <span class="hljs-keyword">false</span>;</span><br><span class="line"><span class="hljs-number">394</span>                <span class="hljs-keyword">try</span> &#123;</span><br><span class="line"><span class="hljs-number">395</span>                    keep = idler.queueIdle();</span><br><span class="line"><span class="hljs-number">396</span>                &#125; <span class="hljs-keyword">catch</span> (Throwable t) &#123;</span><br><span class="line"><span class="hljs-number">397</span>                    Log.wtf(TAG, <span class="hljs-string">"IdleHandler threw exception"</span>, t);</span><br><span class="line"><span class="hljs-number">398</span>                &#125;</span><br><span class="line"><span class="hljs-number">399</span></span><br><span class="line"><span class="hljs-number">400</span>                <span class="hljs-keyword">if</span> (!keep) &#123;</span><br><span class="line"><span class="hljs-number">401</span>                    <span class="hljs-keyword">synchronized</span> (<span class="hljs-keyword">this</span>) &#123;</span><br><span class="line"><span class="hljs-number">402</span>                        mIdleHandlers.remove(idler);</span><br><span class="line"><span class="hljs-number">403</span>                    &#125;</span><br><span class="line"><span class="hljs-number">404</span>                &#125;</span><br><span class="line"><span class="hljs-number">405</span>            &#125;</span><br><span class="line"><span class="hljs-number">406</span></span><br><span class="line"><span class="hljs-number">407</span>            <span class="hljs-comment">// Reset the idle handler count to 0 so we do not run them again.</span></span><br><span class="line"><span class="hljs-number">408</span>            pendingIdleHandlerCount = <span class="hljs-number">0</span>;</span><br><span class="line"><span class="hljs-number">409</span></span><br><span class="line"><span class="hljs-number">410</span>            <span class="hljs-comment">// While calling an idle handler, a new message could have been delivered</span></span><br><span class="line"><span class="hljs-number">411</span>            <span class="hljs-comment">// so go back and look again for a pending message without waiting.</span></span><br><span class="line"><span class="hljs-number">412</span>            nextPollTimeoutMillis = <span class="hljs-number">0</span>;</span><br><span class="line"><span class="hljs-number">413</span>        &#125;</span><br><span class="line"><span class="hljs-number">414</span>    &#125;</span><br></pre></td></tr></table></figure>
+
+<p>首先分析326行的nativePollOnce方法，它的作用是设定下一次发送的时间或挂起线程。其对应的JNI方法为android_os_MessageQueue_nativePollOnce。内部调用NativeMessageQueue的pollOnce函数。</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/jni/android_os_MessageQueue.cpp#188" target="_blank" rel="noopener">/frameworks/base/core/jni/android_os_MessageQueue.cpp</a></p>
+<figure class="highlight c++ hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">188</span><span class="hljs-function"><span class="hljs-keyword">static</span> <span class="hljs-keyword">void</span> <span class="hljs-title">android_os_MessageQueue_nativePollOnce</span><span class="hljs-params">(JNIEnv* env, jobject obj,</span></span></span><br><span class="line"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">189</span>        jlong ptr, jint timeoutMillis)</span> </span>&#123;</span><br><span class="line"><span class="hljs-number">190</span>    NativeMessageQueue* nativeMessageQueue = <span class="hljs-keyword">reinterpret_cast</span>&lt;NativeMessageQueue*&gt;(ptr);</span><br><span class="line"><span class="hljs-number">191</span>    nativeMessageQueue-&gt;pollOnce(env, obj, timeoutMillis);</span><br><span class="line"><span class="hljs-number">192</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<p>NativeMessageQueue的pollOnce函数进一步调用Looper的pollOnce函数，并传入timeoutMills参数。</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/jni/android_os_MessageQueue.cpp#107" target="_blank" rel="noopener">/frameworks/base/core/jni/android_os_MessageQueue.cpp</a></p>
+<figure class="highlight c++ hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">107</span><span class="hljs-keyword">void</span> NativeMessageQueue::pollOnce(JNIEnv* env, jobject pollObj, <span class="hljs-keyword">int</span> timeoutMillis) &#123;</span><br><span class="line"><span class="hljs-number">108</span>    mPollEnv = env;</span><br><span class="line"><span class="hljs-number">109</span>    mPollObj = pollObj;</span><br><span class="line"><span class="hljs-number">110</span>    mLooper-&gt;pollOnce(timeoutMillis);</span><br><span class="line"><span class="hljs-number">111</span>    mPollObj = <span class="hljs-literal">NULL</span>;</span><br><span class="line"><span class="hljs-number">112</span>    mPollEnv = <span class="hljs-literal">NULL</span>;</span><br><span class="line"><span class="hljs-number">113</span></span><br><span class="line"><span class="hljs-number">114</span>    <span class="hljs-keyword">if</span> (mExceptionObj) &#123;</span><br><span class="line"><span class="hljs-number">115</span>        env-&gt;Throw(mExceptionObj);</span><br><span class="line"><span class="hljs-number">116</span>        env-&gt;DeleteLocalRef(mExceptionObj);</span><br><span class="line"><span class="hljs-number">117</span>        mExceptionObj = <span class="hljs-literal">NULL</span>;</span><br><span class="line"><span class="hljs-number">118</span>    &#125;</span><br><span class="line"><span class="hljs-number">119</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<p>一层层往下走，发现最终调用的是Looper的pollInner函数，最终通过系统调用epoll_wait陷入内核态。</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/system/core/libutils/Looper.cpp#242" target="_blank" rel="noopener">/system/core/libutils/Looper.cpp</a></p>
+<figure class="highlight c++ hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">242</span>    <span class="hljs-keyword">int</span> eventCount = epoll_wait(mEpollFd, eventItems, EPOLL_MAX_EVENTS, timeoutMillis);</span><br></pre></td></tr></table></figure>
+
+<p>传入epoll_wait的timeoutMillis参数将直接决定epoll的行为。这里可以分为三种情况：</p>
+<ol>
+<li>timeoutMillis = 0，意味着无需等待。检测epfd上是否有事件，有或没有都将直接返回，继续执行后面的操作。</li>
+<li>timeoutMillis &gt; 0，意味着epoll_wait有超时时间。对于Level Trigger的fd事件（这里是这种情况），在调用epoll_wait的时候会首先查看该事件是否已经存在。如果存在则直接返回，否则线程被挂起呈现阻塞状态，等待超时时间到达后恢复至运行状态。在超时等待的这段时间内，如果有新的消息被加入到链表头部，发送线程将会唤醒此线程以重新决定timeoutMillis的值。</li>
+<li>timeoutMillis = -1，epoll_wait会首先查看监测事件是否已经存在，如果存在则直接返回，否则将无限期地等待下去，直到有新消息到来，其他线程唤醒此线程。</li>
+</ol>
+<p>通过320行可知，nextPollTimeoutMillis在第一次循环时被设置为0，意味着第一次循环将跳过epoll_wait的等待，直接去检查消息链表的状态。</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/java/android/os/MessageQueue.java#320" target="_blank" rel="noopener">/frameworks/base/core/java/android/os/MessageQueue.java</a></p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">320</span>        <span class="hljs-keyword">int</span> nextPollTimeoutMillis = <span class="hljs-number">0</span>;</span><br><span class="line"><span class="hljs-number">321</span>        <span class="hljs-keyword">for</span> (;;) &#123;</span><br><span class="line"><span class="hljs-number">322</span>            <span class="hljs-keyword">if</span> (nextPollTimeoutMillis != <span class="hljs-number">0</span>) &#123;</span><br><span class="line"><span class="hljs-number">323</span>                Binder.flushPendingCommands();</span><br><span class="line"><span class="hljs-number">324</span>            &#125;</span><br><span class="line"><span class="hljs-number">325</span></span><br><span class="line"><span class="hljs-number">326</span>            nativePollOnce(ptr, nextPollTimeoutMillis);</span><br></pre></td></tr></table></figure>
+
+<p>330-339行的主要工作是取出链表中第一个可被处理的消息。上文提到，MessageQueue只用了一个字段（mMessages）来记录消息链表的头部消息，所以通过332行便可以取到头部消息。如果链表头部是同步屏障，那么就要遍历去寻找链表中第一个异步消息。</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/java/android/os/MessageQueue.java#330" target="_blank" rel="noopener">/frameworks/base/core/java/android/os/MessageQueue.java</a></p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">330</span>                <span class="hljs-keyword">final</span> <span class="hljs-keyword">long</span> now = SystemClock.uptimeMillis();</span><br><span class="line"><span class="hljs-number">331</span>                Message prevMsg = <span class="hljs-keyword">null</span>;</span><br><span class="line"><span class="hljs-number">332</span>                Message msg = mMessages;</span><br><span class="line"><span class="hljs-number">333</span>                <span class="hljs-keyword">if</span> (msg != <span class="hljs-keyword">null</span> &amp;&amp; msg.target == <span class="hljs-keyword">null</span>) &#123;</span><br><span class="line"><span class="hljs-number">334</span>                    <span class="hljs-comment">// Stalled by a barrier.  Find the next asynchronous message in the queue.</span></span><br><span class="line"><span class="hljs-number">335</span>                    <span class="hljs-keyword">do</span> &#123;</span><br><span class="line"><span class="hljs-number">336</span>                        prevMsg = msg;</span><br><span class="line"><span class="hljs-number">337</span>                        msg = msg.next;</span><br><span class="line"><span class="hljs-number">338</span>                    &#125; <span class="hljs-keyword">while</span> (msg != <span class="hljs-keyword">null</span> &amp;&amp; !msg.isAsynchronous());</span><br><span class="line"><span class="hljs-number">339</span>                &#125;</span><br></pre></td></tr></table></figure>
+
+<p>当取出的可处理消息为null时，意味着链表中暂时没有消息可以被处理，所以将nextPollTimeoutMillis置为-1，让next下一次轮询的时候直接通过epoll_wait将线程挂起休息。</p>
+<p>反之则需要有进一步的处理，分两种情况讨论：</p>
+<ol>
+<li>当下时间 &lt; 该消息预定的处理时间，此时不应处理消息，需要等待时机成熟。于是将nextPollTimeoutMillis设置为当下时间和预定处理时间之间的差值，保证超时后能够再次轮询此消息，并进行相应处理。</li>
+<li>当下时间 ≥ 该消息预定的处理时间，此时消息已经成熟，应该被处理。此时将mBlocked置为false，表明该线程处于Runnable状态，并且马上就要执行消息的处理方法。接着重构链表，将此消息从链表中删除。最后返回此消息到Looper的loop方法进行消息的实际处理。</li>
+</ol>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/java/android/os/MessageQueue.java#340" target="_blank" rel="noopener">/frameworks/base/core/java/android/os/MessageQueue.java</a></p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">340</span>                <span class="hljs-keyword">if</span> (msg != <span class="hljs-keyword">null</span>) &#123;</span><br><span class="line"><span class="hljs-number">341</span>                    <span class="hljs-keyword">if</span> (now &lt; msg.when) &#123;</span><br><span class="line"><span class="hljs-number">342</span>                        <span class="hljs-comment">// Next message is not ready.  Set a timeout to wake up when it is ready.</span></span><br><span class="line"><span class="hljs-number">343</span>                        nextPollTimeoutMillis = (<span class="hljs-keyword">int</span>) Math.min(msg.when - now, Integer.MAX_VALUE);</span><br><span class="line"><span class="hljs-number">344</span>                    &#125; <span class="hljs-keyword">else</span> &#123;</span><br><span class="line"><span class="hljs-number">345</span>                        <span class="hljs-comment">// Got a message.</span></span><br><span class="line"><span class="hljs-number">346</span>                        mBlocked = <span class="hljs-keyword">false</span>;</span><br><span class="line"><span class="hljs-number">347</span>                        <span class="hljs-keyword">if</span> (prevMsg != <span class="hljs-keyword">null</span>) &#123;</span><br><span class="line"><span class="hljs-number">348</span>                            prevMsg.next = msg.next;</span><br><span class="line"><span class="hljs-number">349</span>                        &#125; <span class="hljs-keyword">else</span> &#123;</span><br><span class="line"><span class="hljs-number">350</span>                            mMessages = msg.next;</span><br><span class="line"><span class="hljs-number">351</span>                        &#125;</span><br><span class="line"><span class="hljs-number">352</span>                        msg.next = <span class="hljs-keyword">null</span>;</span><br><span class="line"><span class="hljs-number">353</span>                        <span class="hljs-keyword">if</span> (DEBUG) Log.v(TAG, <span class="hljs-string">"Returning message: "</span> + msg);</span><br><span class="line"><span class="hljs-number">354</span>                        msg.markInUse();</span><br><span class="line"><span class="hljs-number">355</span>                        <span class="hljs-keyword">return</span> msg;</span><br><span class="line"><span class="hljs-number">356</span>                    &#125;</span><br><span class="line"><span class="hljs-number">357</span>                &#125; <span class="hljs-keyword">else</span> &#123;</span><br><span class="line"><span class="hljs-number">358</span>                    <span class="hljs-comment">// No more messages.</span></span><br><span class="line"><span class="hljs-number">359</span>                    nextPollTimeoutMillis = -<span class="hljs-number">1</span>;</span><br><span class="line"><span class="hljs-number">360</span>                &#125;</span><br></pre></td></tr></table></figure>
+
+<h4 id="2-3-4-IdleHandler有什么用？"><a href="#2-3-4-IdleHandler有什么用？" class="headerlink" title="2.3.4 IdleHandler有什么用？"></a><strong>2.3.4 IdleHandler有什么用？</strong></h4><p>在MessageQueue的next方法中，还会对IdleHandler进行处理。IdleHandler，顾名思义，表示线程空闲时才需要去执行的一些操作。如果此时链表头部的消息为空或尚未到达发送时间，则表明线程空闲，因此可以去处理一些杂事（IdleHandler里的工作）。</p>
+<p>通过319行可知，pendingIdleHandlerCount最初始被赋值为-1。</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/java/android/os/MessageQueue.java#319" target="_blank" rel="noopener">/frameworks/base/core/java/android/os/MessageQueue.java</a></p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">319</span>        <span class="hljs-keyword">int</span> pendingIdleHandlerCount = -<span class="hljs-number">1</span>; <span class="hljs-comment">// -1 only during first iteration</span></span><br></pre></td></tr></table></figure>
+
+<p>所以第一次运行到371行时，pendingIdleHandlerCount必定小于0。通过373行到384行，将mIdleHandlers（类型为ArrayList）中的元素赋值给mPendingIdleHandlers（类型为数组）。之所以不直接使用mIdleHandlers来进行遍历，是因为遍历处理mIdleHandles时无需持有MessageQueue的monitor lock，于是干脆将锁释放，让其他线程可以在处理mPendingIdleHandlers中的元素时，同时往mIdleHandlers中插入新的元素。</p>
+<p>如果不需要对IdleHandler处理，或者mIdleHandlers中没有需要处理的对象，则设置mBlocked为true（377行），在下一轮循环的过程中会通过epoll_wait将本线程挂起。需要注意的一点是，如果此次next()方法能够取出有效消息进行处理，代码是不会执行到371行及以下的位置，它会在355行直接返回。</p>
+<p>接下来便是遍历mIdleHandlers中的元素，并执行它们的queueIdle方法的过程。如果queueIdle返回false，表明该IdleHandler只会执行一次，执行完之后就从mIdleHandlers列表中删除。</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/java/android/os/MessageQueue.java#371" target="_blank" rel="noopener">/frameworks/base/core/java/android/os/MessageQueue.java</a></p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">371</span>                <span class="hljs-keyword">if</span> (pendingIdleHandlerCount &lt; <span class="hljs-number">0</span></span><br><span class="line"><span class="hljs-number">372</span>                        &amp;&amp; (mMessages == <span class="hljs-keyword">null</span> || now &lt; mMessages.when)) &#123;</span><br><span class="line"><span class="hljs-number">373</span>                    pendingIdleHandlerCount = mIdleHandlers.size();</span><br><span class="line"><span class="hljs-number">374</span>                &#125;</span><br><span class="line"><span class="hljs-number">375</span>                <span class="hljs-keyword">if</span> (pendingIdleHandlerCount &lt;= <span class="hljs-number">0</span>) &#123;</span><br><span class="line"><span class="hljs-number">376</span>                    <span class="hljs-comment">// No idle handlers to run.  Loop and wait some more.</span></span><br><span class="line"><span class="hljs-number">377</span>                    mBlocked = <span class="hljs-keyword">true</span>;</span><br><span class="line"><span class="hljs-number">378</span>                    <span class="hljs-keyword">continue</span>;</span><br><span class="line"><span class="hljs-number">379</span>                &#125;</span><br><span class="line"><span class="hljs-number">380</span></span><br><span class="line"><span class="hljs-number">381</span>                <span class="hljs-keyword">if</span> (mPendingIdleHandlers == <span class="hljs-keyword">null</span>) &#123;</span><br><span class="line"><span class="hljs-number">382</span>                    mPendingIdleHandlers = <span class="hljs-keyword">new</span> IdleHandler[Math.max(pendingIdleHandlerCount, <span class="hljs-number">4</span>)];</span><br><span class="line"><span class="hljs-number">383</span>                &#125;</span><br><span class="line"><span class="hljs-number">384</span>                mPendingIdleHandlers = mIdleHandlers.toArray(mPendingIdleHandlers);</span><br><span class="line"><span class="hljs-number">385</span>            &#125;</span><br><span class="line"><span class="hljs-number">386</span></span><br><span class="line"><span class="hljs-number">387</span>            <span class="hljs-comment">// Run the idle handlers.</span></span><br><span class="line"><span class="hljs-number">388</span>            <span class="hljs-comment">// We only ever reach this code block during the first iteration.</span></span><br><span class="line"><span class="hljs-number">389</span>            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">int</span> i = <span class="hljs-number">0</span>; i &lt; pendingIdleHandlerCount; i++) &#123;</span><br><span class="line"><span class="hljs-number">390</span>                <span class="hljs-keyword">final</span> IdleHandler idler = mPendingIdleHandlers[i];</span><br><span class="line"><span class="hljs-number">391</span>                mPendingIdleHandlers[i] = <span class="hljs-keyword">null</span>; <span class="hljs-comment">// release the reference to the handler</span></span><br><span class="line"><span class="hljs-number">392</span></span><br><span class="line"><span class="hljs-number">393</span>                <span class="hljs-keyword">boolean</span> keep = <span class="hljs-keyword">false</span>;</span><br><span class="line"><span class="hljs-number">394</span>                <span class="hljs-keyword">try</span> &#123;</span><br><span class="line"><span class="hljs-number">395</span>                    keep = idler.queueIdle();</span><br><span class="line"><span class="hljs-number">396</span>                &#125; <span class="hljs-keyword">catch</span> (Throwable t) &#123;</span><br><span class="line"><span class="hljs-number">397</span>                    Log.wtf(TAG, <span class="hljs-string">"IdleHandler threw exception"</span>, t);</span><br><span class="line"><span class="hljs-number">398</span>                &#125;</span><br><span class="line"><span class="hljs-number">399</span></span><br><span class="line"><span class="hljs-number">400</span>                <span class="hljs-keyword">if</span> (!keep) &#123;</span><br><span class="line"><span class="hljs-number">401</span>                    <span class="hljs-keyword">synchronized</span> (<span class="hljs-keyword">this</span>) &#123;</span><br><span class="line"><span class="hljs-number">402</span>                        mIdleHandlers.remove(idler);</span><br><span class="line"><span class="hljs-number">403</span>                    &#125;</span><br><span class="line"><span class="hljs-number">404</span>                &#125;</span><br><span class="line"><span class="hljs-number">405</span>            &#125;</span><br><span class="line"><span class="hljs-number">406</span></span><br><span class="line"><span class="hljs-number">407</span>            <span class="hljs-comment">// Reset the idle handler count to 0 so we do not run them again.</span></span><br><span class="line"><span class="hljs-number">408</span>            pendingIdleHandlerCount = <span class="hljs-number">0</span>;</span><br><span class="line"><span class="hljs-number">409</span></span><br><span class="line"><span class="hljs-number">410</span>            <span class="hljs-comment">// While calling an idle handler, a new message could have been delivered</span></span><br><span class="line"><span class="hljs-number">411</span>            <span class="hljs-comment">// so go back and look again for a pending message without waiting.</span></span><br><span class="line"><span class="hljs-number">412</span>            nextPollTimeoutMillis = <span class="hljs-number">0</span>;</span><br><span class="line"><span class="hljs-number">413</span>        &#125;</span><br><span class="line"><span class="hljs-number">414</span>    &#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="3-总结"><a href="#3-总结" class="headerlink" title="3 总结"></a><strong>3 总结</strong></h2><p>本文从以下三个方面详细介绍了Android中的消息机制：</p>
+<ol>
+<li>消息队列准备过程</li>
+<li>消息发送过程</li>
+<li>消息处理过程</li>
+</ol>
+<p>分析了消息从哪里来，到哪里去的问题。顺着这条主线，也穿插讲述了消息机制中一些不为人熟知的机制：同步屏障、epoll机制、delievery time以及IdleHandler的处理时机等。希望这些分析能够帮助到大家。</p>
+
+        </div>
+        
+        <div class="level is-size-7 is-uppercase">
+            <div class="level-start">
+                <div class="level-item">
+                    <span class="is-size-6 has-text-grey has-mr-7">#</span>
+                    <a class="has-link-grey -link" href="/tags/Handler/">Handler</a>, <a class="has-link-grey -link" href="/tags/Message/">Message</a>, <a class="has-link-grey -link" href="/tags/消息机制/">消息机制</a>
+                </div>
+            </div>
+        </div>
+        
+        
+        
+    </div>
+</div>
+
+
+
+
+
+
+</div>
+                
+                    
+
+
+
+
+<div class="column is-4-tablet is-4-desktop is-4-widescreen  has-order-3 column-right is-sticky">
+    
+        
+<div class="card widget" id="toc">
+    <div class="card-content">
+        <div class="menu">
+            <h3 class="menu-label">
+                目录
+            </h3>
+            <ul class="menu-list"><li>
+        <a class="is-flex" href="#1-概述">
+        <span>1 概述</span>
+        </a></li><li>
+        <a class="is-flex" href="#2-详细过程">
+        <span>2 详细过程</span>
+        </a><ul class="menu-list"><li>
+        <a class="is-flex" href="#2-1-消息队列准备过程">
+        <span>2.1 消息队列准备过程</span>
+        </a></li><li>
+        <a class="is-flex" href="#2-2-消息发送过程">
+        <span>2.2 消息发送过程</span>
+        </a><ul class="menu-list"><li>
+        <a class="is-flex" href="#2-2-1-消息被发送到哪个线程？">
+        <span>2.2.1 消息被发送到哪个线程？</span>
+        </a></li><li>
+        <a class="is-flex" href="#2-2-2-消息应该被插入到链表的什么位置？">
+        <span>2.2.2 消息应该被插入到链表的什么位置？</span>
+        </a></li><li>
+        <a class="is-flex" href="#2-2-3-消息加入链表后是否应该主动唤醒线程？">
+        <span>2.2.3 消息加入链表后是否应该主动唤醒线程？</span>
+        </a></li><li>
+        <a class="is-flex" href="#2-2-4-如何主动唤醒线程？">
+        <span>2.2.4 如何主动唤醒线程？</span>
+        </a></li></ul></li><li>
+        <a class="is-flex" href="#2-3-消息处理过程">
+        <span>2.3 消息处理过程</span>
+        </a><ul class="menu-list"><li>
+        <a class="is-flex" href="#2-3-1-Delievery-Time和Dispatch-Time分别指的是什么？">
+        <span>2.3.1 Delievery Time和Dispatch Time分别指的是什么？</span>
+        </a></li><li>
+        <a class="is-flex" href="#2-3-2-消息处理最终执行哪个方法？">
+        <span>2.3.2 消息处理最终执行哪个方法？</span>
+        </a></li><li>
+        <a class="is-flex" href="#2-3-3-如何取出下一个消息？">
+        <span>2.3.3 如何取出下一个消息？</span>
+        </a></li><li>
+        <a class="is-flex" href="#2-3-4-IdleHandler有什么用？">
+        <span>2.3.4 IdleHandler有什么用？</span>
+        </a></li></ul></li></ul></li><li>
+        <a class="is-flex" href="#3-总结">
+        <span>3 总结</span>
+        </a></li></ul>
+        </div>
+    </div>
+</div>
+
+    
+    
+</div>
+
+                
+            </div>
+        </div>
+    </section>
+    <footer class="footer">
+    <div class="container">
+        <div class="level">
+            <div class="level-start has-text-centered-mobile">
+                <a class="footer-logo is-block has-mb-6" href="/">
+                
+                    <img src="/images/banshan.png" alt="知其所以然之Android消息机制" height="28">
+                
+                </a>
+                <p class="is-size-7">
+                &copy; 2019 半山&nbsp;
+                Powered by <a href="https://hexo.io/" target="_blank">Hexo</a> & <a href="https://github.com/ppoffice/hexo-theme-icarus" target="_blank">Icarus</a>
+                
+                </p>
+            </div>
+            <div class="level-end">
+            
+                <div class="field has-addons is-flex-center-mobile has-mt-5-mobile is-flex-wrap is-flex-middle">
+                
+                
+                <p class="control">
+                    <a class="button is-white is-large" target="_blank" title="Creative Commons" href="https://creativecommons.org/">
+                        
+                        <i class="fab fa-creative-commons"></i>
+                        
+                    </a>
+                </p>
+                
+                <p class="control">
+                    <a class="button is-white is-large" target="_blank" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/">
+                        
+                        <i class="fab fa-creative-commons-by"></i>
+                        
+                    </a>
+                </p>
+                
+                </div>
+            
+            </div>
+        </div>
+    </div>
+</footer>
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script>
+<script>moment.locale("zh-CN");</script>
+
+<script>
+var IcarusThemeSettings = {
+    article: {
+        highlight: {
+            clipboard: true,
+            fold: 'unfolded'
+        }
+    }
+};
+</script>
+
+
+    <script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script>
+
+
+
+    
+    
+    
+    <script src="/js/animation.js"></script>
+    
+
+    
+    
+    
+    <script src="https://cdn.jsdelivr.net/npm/lightgallery@1.6.8/dist/js/lightgallery.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.7.0/dist/js/jquery.justifiedGallery.min.js" defer></script>
+    <script src="/js/gallery.js" defer></script>
+    
+
+    
+    
+
+<div id="outdated">
+    <h6>Your browser is out-of-date!</h6>
+    <p>Update your browser to view this website correctly. <a id="btnUpdateBrowser" href="http://outdatedbrowser.com/">Update
+            my browser now </a></p>
+    <p class="last"><a href="#" id="btnCloseUpdateBrowser" title="Close">&times;</a></p>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/outdatedbrowser@1.1.5/outdatedbrowser/outdatedbrowser.min.js" defer></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        outdatedBrowser({
+            bgColor: '#f25648',
+            color: '#ffffff',
+            lowerThan: 'flex'
+        });
+    });
+</script>
+
+
+    
+    
+<script src="https://cdn.jsdelivr.net/npm/mathjax@2.7.5/unpacked/MathJax.js?config=TeX-MML-AM_CHTML" defer></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    MathJax.Hub.Config({
+        'HTML-CSS': {
+            matchFontHeight: false
+        },
+        SVG: {
+            matchFontHeight: false
+        },
+        CommonHTML: {
+            matchFontHeight: false
+        },
+        tex2jax: {
+            inlineMath: [
+                ['$','$'],
+                ['\\(','\\)']
+            ]
+        }
+    });
+});
+</script>
+
+    
+    
+
+<a id="back-to-top" title="回到顶端" href="javascript:;">
+    <i class="fas fa-chevron-up"></i>
+</a>
+<script src="/js/back-to-top.js" defer></script>
+
+
+    
+    
+
+    
+    
+    
+    
+
+    
+    
+    
+    
+    
+
+
+<script src="/js/main.js" defer></script>
+
+    
+    <div class="searchbox ins-search">
+    <div class="searchbox-container ins-search-container">
+        <div class="searchbox-input-wrapper">
+            <input type="text" class="searchbox-input ins-search-input" placeholder="想要查找什么...">
+            <span class="searchbox-close ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="searchbox-result-wrapper ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script>
+    (function (window) {
+        var INSIGHT_CONFIG = {
+            TRANSLATION: {
+                POSTS: '文章',
+                PAGES: '页面',
+                CATEGORIES: '分类',
+                TAGS: '标签',
+                UNTITLED: '(无标题)',
+            },
+            CONTENT_URL: '/content.json',
+        };
+        window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+    })(window);
+</script>
+<script src="/js/insight.js" defer></script>
+<link rel="stylesheet" href="/css/search.css">
+<link rel="stylesheet" href="/css/insight.css">
+    
+</body>
+</html>
