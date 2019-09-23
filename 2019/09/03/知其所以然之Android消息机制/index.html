@@ -80,6 +80,10 @@
     
     
     
+        <script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    
+
+    
 
 
 <link rel="stylesheet" href="/css/style.css">
@@ -143,6 +147,11 @@
                 </div>
                 
                 
+                
+                <span class="level-item has-text-grey" id="busuanzi_container_page_pv">
+                    <i class="far fa-eye"></i>
+                    <span id="busuanzi_value_page_pv">0</span>次访问
+                </span>
                 
             </div>
         </div>
@@ -434,6 +443,27 @@
 
 
 
+
+<div class="card">
+    <div class="card-content">
+        <h3 class="title is-5 has-text-weight-normal">评论</h3>
+        
+<div id="valine-thread" class="content"></div>
+<script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+<script src="//unpkg.com/valine/dist/Valine.min.js"></script>
+<script>
+    new Valine({
+        el: '#valine-thread' ,
+        notify: false,
+        verify: true,
+        app_id: 'ObVYhEGoxowBaBT5Dk5a2Iyo-gzGzoHsz',
+        app_key: 'g0qynPkoFuJPt8J5NrCAALlk',
+        placeholder: '评论时最好先留下昵称~'
+    });
+</script>
+
+    </div>
+</div>
 </div>
                 
                     
@@ -517,6 +547,11 @@
                 <p class="is-size-7">
                 &copy; 2019 半山&nbsp;
                 Powered by <a href="https://hexo.io/" target="_blank">Hexo</a> & <a href="https://github.com/ppoffice/hexo-theme-icarus" target="_blank">Icarus</a>
+                
+                <br>
+                <span id="busuanzi_container_site_uv">
+                共<span id="busuanzi_value_site_uv">0</span>个访客
+                </span>
                 
                 </p>
             </div>
@@ -648,6 +683,8 @@ document.addEventListener('DOMContentLoaded', function () {
     
     
     
+    
+
     
 
 
