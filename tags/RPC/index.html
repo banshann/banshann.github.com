@@ -2,7 +2,7 @@
 <html lang="zh">
 <head><meta name="generator" content="Hexo 3.9.0">
     <meta charset="utf-8">
-<title>半山的博客</title>
+<title>标签: RPC - 半山的博客</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 
 
@@ -11,7 +11,7 @@
 <meta name="keywords" content="半山,Android,Framework,ART,虚拟机,Java">
 <meta property="og:type" content="website">
 <meta property="og:title" content="半山的博客">
-<meta property="og:url" content="https://banshan.tech/index.html">
+<meta property="og:url" content="https://banshan.tech/tags/RPC/index.html">
 <meta property="og:site_name" content="半山的博客">
 <meta property="og:description" content="半山的博客，主要记录一些技术分享和生活杂谈。喜欢研究Android Framework和ART虚拟机，希望能输出一些高质量的文章，即构建自己的知识体系，也帮助到大家。">
 <meta property="og:locale" content="zh-CN">
@@ -101,7 +101,7 @@
             
             <div class="navbar-start">
                 
-                <a class="navbar-item is-active" href="/">主页</a>
+                <a class="navbar-item" href="/">主页</a>
                 
                 <a class="navbar-item" href="/archives">归档</a>
                 
@@ -129,7 +129,17 @@
     <section class="section">
         <div class="container">
             <div class="columns">
-                <div class="column is-9-tablet is-9-desktop is-9-widescreen has-order-2 column-main">
+                <div class="column is-9-tablet is-9-desktop is-9-widescreen has-order-2 column-main"><div class="card">
+    <div class="card-content">
+        <nav class="breadcrumb" aria-label="breadcrumbs">
+        <ul>
+            <li><a href="/tags">标签</a></li>
+            <li class="is-active"><a href="#" aria-current="page">RPC</a></li>
+        </ul>
+        </nav>
+    </div>
+</div>
+
     <div class="card">
     
     <div class="card-content article ">
@@ -293,55 +303,6 @@
 
         </div>
         
-        
-        
-    </div>
-</div>
-
-
-
-
-
-
-
-
-    <div class="card">
-    
-    <div class="card-content article ">
-        
-        <div class="level article-meta is-size-7 is-uppercase is-mobile is-overflow-x-auto">
-            <div class="level-left">
-                <time class="level-item has-text-grey" datetime="2019-09-03T12:00:00.000Z">2019-09-03</time>
-                
-                <div class="level-item">
-                <a class="has-link-grey -link" href="/categories/Android-Framework/">Android Framework</a>
-                </div>
-                
-                
-                
-            </div>
-        </div>
-        
-        <h1 class="title is-size-3 is-size-4-mobile has-text-weight-normal">
-            
-                <a class="has-link-black-ter" href="/2019/09/03/知其所以然之Android消息机制/">知其所以然之Android消息机制</a>
-            
-        </h1>
-        <div class="content">
-            <h2 id="1-概述"><a href="#1-概述" class="headerlink" title="1 概述"></a><strong>1 概述</strong></h2><p>消息机制是Android中重要的线程间通信手段。</p>
-<p>它的存在可以让一个线程通知另一个线程去工作。那么一个线程为什么会有让另一个线程工作的需求呢？</p>
-<p>可以看一个常见的应用场景——UI更新。Google官方有一句话解释了UI更新的规则：The Android UI toolkit is not thread-safe and the view must always be manipulated on the UI thread。 因为UI更新并不是线程安全的，所以Android为了规避开发者可能的不安全操作，干脆将所有UI更新都放在了主线程中进行。在这种场景下，就会出现其他线程请求主线程来帮忙更新UI的需求。</p>
-<p>除了UI更新，某些设计模式的实现也离不开消息机制。</p>
-        </div>
-        
-        
-        <div class="level is-mobile">
-            <div class="level-start">
-                <div class="level-item">
-                <a class="button is-size-7 is-light" href="/2019/09/03/知其所以然之Android消息机制/">阅读更多</a>
-                </div>
-            </div>
-        </div>
         
         
     </div>

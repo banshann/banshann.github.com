@@ -2,23 +2,24 @@
 <html lang="zh">
 <head><meta name="generator" content="Hexo 3.9.0">
     <meta charset="utf-8">
-<title>半山的博客</title>
+<title>Binder概述 - 半山的博客</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 
 
 
-    <meta name="description" content="半山的博客，主要记录一些技术分享和生活杂谈。喜欢研究Android Framework和ART虚拟机，希望能输出一些高质量的文章，即构建自己的知识体系，也帮助到大家。">
-<meta name="keywords" content="半山,Android,Framework,ART,虚拟机,Java">
-<meta property="og:type" content="website">
-<meta property="og:title" content="半山的博客">
-<meta property="og:url" content="https://banshan.tech/index.html">
+    <meta name="description" content="在编程的世界中，不同进程间的通信、协同、合作随处可见。很多时候，人们习惯用IPC(Inter Process Communication，跨进程通信)来称呼它们。譬如Binder在多数情况下也被称为Android世界中的IPC机制。但如果以应用开发者的视角来看，Binder也可以称为Android世界中的RPC(Remote Procedure Call，远程过程调用)机制。  IPC(Inter">
+<meta name="keywords" content="Binder,RPC">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Binder概述">
+<meta property="og:url" content="https://banshan.tech/2019/10/10/Binder概述/index.html">
 <meta property="og:site_name" content="半山的博客">
-<meta property="og:description" content="半山的博客，主要记录一些技术分享和生活杂谈。喜欢研究Android Framework和ART虚拟机，希望能输出一些高质量的文章，即构建自己的知识体系，也帮助到大家。">
+<meta property="og:description" content="在编程的世界中，不同进程间的通信、协同、合作随处可见。很多时候，人们习惯用IPC(Inter Process Communication，跨进程通信)来称呼它们。譬如Binder在多数情况下也被称为Android世界中的IPC机制。但如果以应用开发者的视角来看，Binder也可以称为Android世界中的RPC(Remote Procedure Call，远程过程调用)机制。  IPC(Inter">
 <meta property="og:locale" content="zh-CN">
 <meta property="og:image" content="https://banshan.tech/images/og_image.png">
+<meta property="og:updated_time" content="2019-10-10T08:22:35.407Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="半山的博客">
-<meta name="twitter:description" content="半山的博客，主要记录一些技术分享和生活杂谈。喜欢研究Android Framework和ART虚拟机，希望能输出一些高质量的文章，即构建自己的知识体系，也帮助到大家。">
+<meta name="twitter:title" content="Binder概述">
+<meta name="twitter:description" content="在编程的世界中，不同进程间的通信、协同、合作随处可见。很多时候，人们习惯用IPC(Inter Process Communication，跨进程通信)来称呼它们。譬如Binder在多数情况下也被称为Android世界中的IPC机制。但如果以应用开发者的视角来看，Binder也可以称为Android世界中的RPC(Remote Procedure Call，远程过程调用)机制。  IPC(Inter">
 <meta name="twitter:image" content="https://banshan.tech/images/og_image.png">
 
 
@@ -93,7 +94,7 @@
         <div class="navbar-brand is-flex-center">
             <a class="navbar-item navbar-logo" href="/">
             
-                <img src="/images/banshan.png" alt="半山的博客" height="28">
+                <img src="/images/banshan.png" alt="Binder概述" height="28">
             
             </a>
         </div>
@@ -101,7 +102,7 @@
             
             <div class="navbar-start">
                 
-                <a class="navbar-item is-active" href="/">主页</a>
+                <a class="navbar-item" href="/">主页</a>
                 
                 <a class="navbar-item" href="/archives">归档</a>
                 
@@ -116,6 +117,10 @@
             <div class="navbar-end">
                 
                 
+                <a class="navbar-item is-hidden-tablet catalogue" title="目录" href="javascript:;">
+                    <i class="fas fa-list-ul"></i>
+                </a>
+                
                 
                 <a class="navbar-item search" title="搜索" href="javascript:;">
                     <i class="fas fa-search"></i>
@@ -129,8 +134,7 @@
     <section class="section">
         <div class="container">
             <div class="columns">
-                <div class="column is-9-tablet is-9-desktop is-9-widescreen has-order-2 column-main">
-    <div class="card">
+                <div class="column is-10-tablet is-10-desktop is-10-widescreen has-order-2 column-main"><div class="card">
     
     <div class="card-content article ">
         
@@ -144,12 +148,17 @@
                 
                 
                 
+                <span class="level-item has-text-grey" id="busuanzi_container_page_pv">
+                    <i class="far fa-eye"></i>
+                    <span id="busuanzi_value_page_pv">0</span>次访问
+                </span>
+                
             </div>
         </div>
         
         <h1 class="title is-size-3 is-size-4-mobile has-text-weight-normal">
             
-                <a class="has-link-black-ter" href="/2019/10/10/Binder概述/">Binder概述</a>
+                Binder概述
             
         </h1>
         <div class="content">
@@ -293,55 +302,15 @@
 
         </div>
         
-        
-        
-    </div>
-</div>
-
-
-
-
-
-
-
-
-    <div class="card">
-    
-    <div class="card-content article ">
-        
-        <div class="level article-meta is-size-7 is-uppercase is-mobile is-overflow-x-auto">
-            <div class="level-left">
-                <time class="level-item has-text-grey" datetime="2019-09-03T12:00:00.000Z">2019-09-03</time>
-                
-                <div class="level-item">
-                <a class="has-link-grey -link" href="/categories/Android-Framework/">Android Framework</a>
-                </div>
-                
-                
-                
-            </div>
-        </div>
-        
-        <h1 class="title is-size-3 is-size-4-mobile has-text-weight-normal">
-            
-                <a class="has-link-black-ter" href="/2019/09/03/知其所以然之Android消息机制/">知其所以然之Android消息机制</a>
-            
-        </h1>
-        <div class="content">
-            <h2 id="1-概述"><a href="#1-概述" class="headerlink" title="1 概述"></a><strong>1 概述</strong></h2><p>消息机制是Android中重要的线程间通信手段。</p>
-<p>它的存在可以让一个线程通知另一个线程去工作。那么一个线程为什么会有让另一个线程工作的需求呢？</p>
-<p>可以看一个常见的应用场景——UI更新。Google官方有一句话解释了UI更新的规则：The Android UI toolkit is not thread-safe and the view must always be manipulated on the UI thread。 因为UI更新并不是线程安全的，所以Android为了规避开发者可能的不安全操作，干脆将所有UI更新都放在了主线程中进行。在这种场景下，就会出现其他线程请求主线程来帮忙更新UI的需求。</p>
-<p>除了UI更新，某些设计模式的实现也离不开消息机制。</p>
-        </div>
-        
-        
-        <div class="level is-mobile">
+        <div class="level is-size-7 is-uppercase">
             <div class="level-start">
                 <div class="level-item">
-                <a class="button is-size-7 is-light" href="/2019/09/03/知其所以然之Android消息机制/">阅读更多</a>
+                    <span class="is-size-6 has-text-grey has-mr-7">#</span>
+                    <a class="has-link-grey -link" href="/tags/Binder/">Binder</a>, <a class="has-link-grey -link" href="/tags/RPC/">RPC</a>
                 </div>
             </div>
         </div>
+        
         
         
     </div>
@@ -351,9 +320,42 @@
 
 
 
+<div class="card card-transparent">
+    <div class="level post-navigation is-flex-wrap is-mobile">
+        
+        
+        <div class="level-end">
+            <a class="level level-item has-link-grey  article-nav-next" href="/2019/09/03/知其所以然之Android消息机制/">
+                <span class="level-item">知其所以然之Android消息机制</span>
+                <i class="level-item fas fa-chevron-right"></i>
+            </a>
+        </div>
+        
+    </div>
+</div>
 
 
 
+<div class="card">
+    <div class="card-content">
+        <h3 class="title is-5 has-text-weight-normal">评论</h3>
+        
+<div id="valine-thread" class="content"></div>
+<script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+<script src="//unpkg.com/valine/dist/Valine.min.js"></script>
+<script>
+    new Valine({
+        el: '#valine-thread' ,
+        notify: false,
+        verify: true,
+        app_id: 'iXHBSBSU1KTNC22OGBvTkw52-MdYXbMMI',
+        app_key: 'c2FBJHKWUYse4kFTDlL5vRLg',
+        placeholder: '评论时最好先留下昵称~'
+    });
+</script>
+
+    </div>
+</div>
 </div>
                 
                     
@@ -361,79 +363,54 @@
 
 
 
-<div class="column is-3-tablet is-3-desktop is-3-widescreen  has-order-1 column-left ">
+<div class="column is-4-tablet is-4-desktop is-4-widescreen  has-order-3 column-right is-sticky">
     
         
-<div class="card widget">
+<div class="card widget" id="toc">
     <div class="card-content">
-        <nav class="level">
-            <div class="level-item has-text-centered" style="flex-shrink: 1">
-                <div>
-                    
-                        <img class="image is-128x128 has-mb-6" src="/images/banshan.png" alt="半山">
-                    
-                    
-                    <p class="is-size-4 is-block">
-                        半山
-                    </p>
-                    
-                    
-                    <p class="is-size-6 is-block">
-                        毁人二字，非惰即傲
-                    </p>
-                    
-                    
-                    <p class="is-size-6 is-flex is-flex-center has-text-grey">
-                        <i class="fas fa-map-marker-alt has-mr-7"></i>
-                        <span>中国 上海</span>
-                    </p>
-                    
-                </div>
-            </div>
-        </nav>
-        <nav class="level is-mobile">
-            <div class="level-item has-text-centered is-marginless">
-                <div>
-                    <p class="heading">
-                        文章
-                    </p>
-                    <p class="title has-text-weight-normal">
-                        2
-                    </p>
-                </div>
-            </div>
-            <div class="level-item has-text-centered is-marginless">
-                <div>
-                    <p class="heading">
-                        分类
-                    </p>
-                    <p class="title has-text-weight-normal">
-                        2
-                    </p>
-                </div>
-            </div>
-            <div class="level-item has-text-centered is-marginless">
-                <div>
-                    <p class="heading">
-                        标签
-                    </p>
-                    <p class="title has-text-weight-normal">
-                        5
-                    </p>
-                </div>
-            </div>
-        </nav>
-        
-        
+        <div class="menu">
+            <h3 class="menu-label">
+                目录
+            </h3>
+            <ul class="menu-list"><li>
+        <a class="is-flex" href="#1-Android中为什么需要大量的RPC？">
+        <span>1. Android中为什么需要大量的RPC？</span>
+        </a></li><li>
+        <a class="is-flex" href="#2-Binder世界里的service到底是什么概念？">
+        <span>2. Binder世界里的service到底是什么概念？</span>
+        </a><ul class="menu-list"><li>
+        <a class="is-flex" href="#2-1-service与进程-线程的关系">
+        <span>2.1 service与进程/线程的关系</span>
+        </a></li></ul></li><li>
+        <a class="is-flex" href="#3-RPC的内部是如何构成的？">
+        <span>3. RPC的内部是如何构成的？</span>
+        </a><ul class="menu-list"><li>
+        <a class="is-flex" href="#3-1-“人才中心”的例子">
+        <span>3.1 “人才中心”的例子</span>
+        </a></li><li>
+        <a class="is-flex" href="#3-2-剪贴板的例子">
+        <span>3.2 剪贴板的例子</span>
+        </a><ul class="menu-list"><li>
+        <a class="is-flex" href="#3-2-1-service对象的创建过程">
+        <span>3.2.1 service对象的创建过程</span>
+        </a></li><li>
+        <a class="is-flex" href="#3-2-2-寻找service对象的代理对象">
+        <span>3.2.2 寻找service对象的代理对象</span>
+        </a></li><li>
+        <a class="is-flex" href="#3-2-3-通过代理对象进行RPC">
+        <span>3.2.3 通过代理对象进行RPC</span>
+        </a></li><li>
+        <a class="is-flex" href="#3-2-4-服务对象处理接收到的请求">
+        <span>3.2.4 服务对象处理接收到的请求</span>
+        </a></li></ul></li></ul></li><li>
+        <a class="is-flex" href="#4-总结">
+        <span>4. 总结</span>
+        </a></li></ul>
+        </div>
     </div>
 </div>
+
     
-        
-    
-    
-        <div class="column-right-shadow is-hidden-widescreen is-sticky">
-        
-        </div>
     
 </div>
 
@@ -447,7 +424,7 @@
             <div class="level-start has-text-centered-mobile">
                 <a class="footer-logo is-block has-mb-6" href="/">
                 
-                    <img src="/images/banshan.png" alt="半山的博客" height="28">
+                    <img src="/images/banshan.png" alt="Binder概述" height="28">
                 
                 </a>
                 <p class="is-size-7">
