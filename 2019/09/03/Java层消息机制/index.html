@@ -2,7 +2,7 @@
 <html lang="zh">
 <head><meta name="generator" content="Hexo 3.9.0">
     <meta charset="utf-8">
-<title>知其所以然之Android消息机制 - 半山的博客</title>
+<title>Java层消息机制 - 半山的博客</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 
 
@@ -10,15 +10,15 @@
     <meta name="description" content="1 概述消息机制是Android中重要的线程间通信手段。 它的存在可以让一个线程通知另一个线程去工作。那么一个线程为什么会有让另一个线程工作的需求呢？ 可以看一个常见的应用场景——UI更新。Google官方有一句话解释了UI更新的规则：The Android UI toolkit is not thread-safe and the view must always be manipulated">
 <meta name="keywords" content="消息机制,Handler,Message">
 <meta property="og:type" content="article">
-<meta property="og:title" content="知其所以然之Android消息机制">
-<meta property="og:url" content="https://banshan.tech/2019/09/03/知其所以然之Android消息机制/index.html">
+<meta property="og:title" content="Java层消息机制">
+<meta property="og:url" content="https://banshan.tech/2019/09/03/Java层消息机制/index.html">
 <meta property="og:site_name" content="半山的博客">
 <meta property="og:description" content="1 概述消息机制是Android中重要的线程间通信手段。 它的存在可以让一个线程通知另一个线程去工作。那么一个线程为什么会有让另一个线程工作的需求呢？ 可以看一个常见的应用场景——UI更新。Google官方有一句话解释了UI更新的规则：The Android UI toolkit is not thread-safe and the view must always be manipulated">
 <meta property="og:locale" content="zh-CN">
 <meta property="og:image" content="https://banshan.tech/images/og_image.png">
-<meta property="og:updated_time" content="2019-09-20T09:18:23.247Z">
+<meta property="og:updated_time" content="2019-10-10T08:29:48.665Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="知其所以然之Android消息机制">
+<meta name="twitter:title" content="Java层消息机制">
 <meta name="twitter:description" content="1 概述消息机制是Android中重要的线程间通信手段。 它的存在可以让一个线程通知另一个线程去工作。那么一个线程为什么会有让另一个线程工作的需求呢？ 可以看一个常见的应用场景——UI更新。Google官方有一句话解释了UI更新的规则：The Android UI toolkit is not thread-safe and the view must always be manipulated">
 <meta name="twitter:image" content="https://banshan.tech/images/og_image.png">
 
@@ -94,7 +94,7 @@
         <div class="navbar-brand is-flex-center">
             <a class="navbar-item navbar-logo" href="/">
             
-                <img src="/images/banshan.png" alt="知其所以然之Android消息机制" height="28">
+                <img src="/images/banshan.png" alt="Java层消息机制" height="28">
             
             </a>
         </div>
@@ -158,7 +158,7 @@
         
         <h1 class="title is-size-3 is-size-4-mobile has-text-weight-normal">
             
-                知其所以然之Android消息机制
+                Java层消息机制
             
         </h1>
         <div class="content">
@@ -555,7 +555,7 @@
             <div class="level-start has-text-centered-mobile">
                 <a class="footer-logo is-block has-mb-6" href="/">
                 
-                    <img src="/images/banshan.png" alt="知其所以然之Android消息机制" height="28">
+                    <img src="/images/banshan.png" alt="Java层消息机制" height="28">
                 
                 </a>
                 <p class="is-size-7">
