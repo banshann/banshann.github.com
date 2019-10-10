@@ -16,7 +16,7 @@
 <meta property="og:description" content="在编程的世界中，不同进程间的通信、协同、合作随处可见。很多时候，人们习惯用IPC(Inter Process Communication，跨进程通信)来称呼它们。譬如Binder在多数情况下也被称为Android世界中的IPC机制。但如果以应用开发者的视角来看，Binder也可以称为Android世界中的RPC(Remote Procedure Call，远程过程调用)机制。  IPC(Inter">
 <meta property="og:locale" content="zh-CN">
 <meta property="og:image" content="https://banshan.tech/images/og_image.png">
-<meta property="og:updated_time" content="2019-10-10T08:22:35.407Z">
+<meta property="og:updated_time" content="2019-10-10T08:24:26.404Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Binder概述">
 <meta name="twitter:description" content="在编程的世界中，不同进程间的通信、协同、合作随处可见。很多时候，人们习惯用IPC(Inter Process Communication，跨进程通信)来称呼它们。譬如Binder在多数情况下也被称为Android世界中的IPC机制。但如果以应用开发者的视角来看，Binder也可以称为Android世界中的RPC(Remote Procedure Call，远程过程调用)机制。  IPC(Inter">
@@ -171,6 +171,8 @@
 <p>一种建构于IPC基础之上的方法调用。对于客户端而言，它可以感知到的仅仅是方法调用和获取返回值两个过程。然而实际上这个方法内部完成了客户端参数打包，数据传输，服务端数据解包，服务端数据处理，服务端结果返回等一系列中间过程。只不过这些过程对于客户端而言都是“透明”的。所以可以说IPC只是RPC中的一个环节，除此之外，RPC还包含数据打包，解包以及处理的过程，它们可以统称为信息的处理和加工过程。</p>
 </li>
 </ul>
+<a id="more"></a>
+
 <h2 id="1-Android中为什么需要大量的RPC？"><a href="#1-Android中为什么需要大量的RPC？" class="headerlink" title="1. Android中为什么需要大量的RPC？"></a>1. Android中为什么需要大量的RPC？</h2><p>下面举一个剪贴板的例子，来直观地呈现RPC的内涵。</p>
 <p>通过如下代码，我们可以将一段文字复制到剪贴板。在执行第8行代码后，便可以将文本复制到剪贴板上。这里事先透露下，第8行代码本质上是一个RPC。</p>
 <figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">1</span>    <span class="hljs-comment">// 获取系统剪贴板</span></span><br><span class="line"><span class="hljs-number">2</span>    ClipboardManager clipboard = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);</span><br><span class="line"><span class="hljs-number">3</span>    </span><br><span class="line"><span class="hljs-number">4</span>    <span class="hljs-comment">// 创建一个剪贴数据集，包含一个普通文本数据条目（需要复制的数据）</span></span><br><span class="line"><span class="hljs-number">5</span>    ClipData clipData = ClipData.newPlainText(<span class="hljs-keyword">null</span>, <span class="hljs-string">"需要复制的文本数据"</span>);</span><br><span class="line"><span class="hljs-number">6</span>    </span><br><span class="line"><span class="hljs-number">7</span>    <span class="hljs-comment">// 把数据集设置（复制）到剪贴板</span></span><br><span class="line"><span class="hljs-number">8</span>    clipboard.setPrimaryClip(clipData);</span><br></pre></td></tr></table></figure>
