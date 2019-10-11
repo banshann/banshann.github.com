@@ -153,7 +153,10 @@
             
         </h1>
         <div class="content">
-            <p>在编程的世界中，不同进程间的通信、协同、合作随处可见。很多时候，人们习惯用IPC(<code>I</code>nter <code>P</code>rocess <code>C</code>ommunication，跨进程通信)来称呼它们。譬如Binder在多数情况下也被称为Android世界中的IPC机制。但如果以应用开发者的视角来看，Binder也可以称为Android世界中的RPC(<code>R</code>emote <code>P</code>rocedure <code>C</code>all，远程过程调用)机制。</p>
+            <blockquote>
+<p>本文分析基于Android P(9.0) 源码</p>
+</blockquote>
+<p>在编程的世界中，不同进程间的通信、协同、合作随处可见。很多时候，人们习惯用IPC(<code>I</code>nter <code>P</code>rocess <code>C</code>ommunication，跨进程通信)来称呼它们。譬如Binder在多数情况下也被称为Android世界中的IPC机制。但如果以应用开发者的视角来看，Binder也可以称为Android世界中的RPC(<code>R</code>emote <code>P</code>rocedure <code>C</code>all，远程过程调用)机制。</p>
 <ul>
 <li><p>IPC(<code>I</code>nter <code>P</code>rocess <code>C</code>ommunication，跨进程通信)</p>
 <p>泛指一切用于进程间传递信息量（传输数据只是传递信息量的一个子集）的方式，譬如socket/pipe/FIFO/semaphore等。这些名称表征的是信息传输的具体方式，而不涉及信息的处理和加工。</p>
@@ -207,7 +210,10 @@
             
         </h1>
         <div class="content">
-            <h2 id="1-概述"><a href="#1-概述" class="headerlink" title="1 概述"></a><strong>1 概述</strong></h2><p>消息机制是Android中重要的线程间通信手段。</p>
+            <blockquote>
+<p>本文分析基于Android P(9.0) 源码</p>
+</blockquote>
+<h2 id="1-概述"><a href="#1-概述" class="headerlink" title="1 概述**"></a>1 概述**</h2><p>消息机制是Android中重要的线程间通信手段。</p>
 <p>它的存在可以让一个线程通知另一个线程去工作。那么一个线程为什么会有让另一个线程工作的需求呢？</p>
 <p>可以看一个常见的应用场景——UI更新。Google官方有一句话解释了UI更新的规则：The Android UI toolkit is not thread-safe and the view must always be manipulated on the UI thread。 因为UI更新并不是线程安全的，所以Android为了规避开发者可能的不安全操作，干脆将所有UI更新都放在了主线程中进行。在这种场景下，就会出现其他线程请求主线程来帮忙更新UI的需求。</p>
 <p>除了UI更新，某些设计模式的实现也离不开消息机制。</p>

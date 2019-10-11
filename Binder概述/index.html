@@ -7,19 +7,19 @@
 
 
 
-    <meta name="description" content="在编程的世界中，不同进程间的通信、协同、合作随处可见。很多时候，人们习惯用IPC(Inter Process Communication，跨进程通信)来称呼它们。譬如Binder在多数情况下也被称为Android世界中的IPC机制。但如果以应用开发者的视角来看，Binder也可以称为Android世界中的RPC(Remote Procedure Call，远程过程调用)机制。  IPC(Inter">
+    <meta name="description" content="本文分析基于Android P(9.0) 源码  在编程的世界中，不同进程间的通信、协同、合作随处可见。很多时候，人们习惯用IPC(Inter Process Communication，跨进程通信)来称呼它们。譬如Binder在多数情况下也被称为Android世界中的IPC机制。但如果以应用开发者的视角来看，Binder也可以称为Android世界中的RPC(Remote Procedure">
 <meta name="keywords" content="Binder,RPC">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Binder概述">
 <meta property="og:url" content="https://banshan.tech/Binder概述/index.html">
 <meta property="og:site_name" content="芦半山的博客">
-<meta property="og:description" content="在编程的世界中，不同进程间的通信、协同、合作随处可见。很多时候，人们习惯用IPC(Inter Process Communication，跨进程通信)来称呼它们。譬如Binder在多数情况下也被称为Android世界中的IPC机制。但如果以应用开发者的视角来看，Binder也可以称为Android世界中的RPC(Remote Procedure Call，远程过程调用)机制。  IPC(Inter">
+<meta property="og:description" content="本文分析基于Android P(9.0) 源码  在编程的世界中，不同进程间的通信、协同、合作随处可见。很多时候，人们习惯用IPC(Inter Process Communication，跨进程通信)来称呼它们。譬如Binder在多数情况下也被称为Android世界中的IPC机制。但如果以应用开发者的视角来看，Binder也可以称为Android世界中的RPC(Remote Procedure">
 <meta property="og:locale" content="zh-CN">
 <meta property="og:image" content="https://banshan.tech/images/og_image.png">
-<meta property="og:updated_time" content="2019-10-10T08:28:40.949Z">
+<meta property="og:updated_time" content="2019-10-11T07:13:35.774Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Binder概述">
-<meta name="twitter:description" content="在编程的世界中，不同进程间的通信、协同、合作随处可见。很多时候，人们习惯用IPC(Inter Process Communication，跨进程通信)来称呼它们。譬如Binder在多数情况下也被称为Android世界中的IPC机制。但如果以应用开发者的视角来看，Binder也可以称为Android世界中的RPC(Remote Procedure Call，远程过程调用)机制。  IPC(Inter">
+<meta name="twitter:description" content="本文分析基于Android P(9.0) 源码  在编程的世界中，不同进程间的通信、协同、合作随处可见。很多时候，人们习惯用IPC(Inter Process Communication，跨进程通信)来称呼它们。譬如Binder在多数情况下也被称为Android世界中的IPC机制。但如果以应用开发者的视角来看，Binder也可以称为Android世界中的RPC(Remote Procedure">
 <meta name="twitter:image" content="https://banshan.tech/images/og_image.png">
 
 
@@ -162,7 +162,10 @@
             
         </h1>
         <div class="content">
-            <p>在编程的世界中，不同进程间的通信、协同、合作随处可见。很多时候，人们习惯用IPC(<code>I</code>nter <code>P</code>rocess <code>C</code>ommunication，跨进程通信)来称呼它们。譬如Binder在多数情况下也被称为Android世界中的IPC机制。但如果以应用开发者的视角来看，Binder也可以称为Android世界中的RPC(<code>R</code>emote <code>P</code>rocedure <code>C</code>all，远程过程调用)机制。</p>
+            <blockquote>
+<p>本文分析基于Android P(9.0) 源码</p>
+</blockquote>
+<p>在编程的世界中，不同进程间的通信、协同、合作随处可见。很多时候，人们习惯用IPC(<code>I</code>nter <code>P</code>rocess <code>C</code>ommunication，跨进程通信)来称呼它们。譬如Binder在多数情况下也被称为Android世界中的IPC机制。但如果以应用开发者的视角来看，Binder也可以称为Android世界中的RPC(<code>R</code>emote <code>P</code>rocedure <code>C</code>all，远程过程调用)机制。</p>
 <ul>
 <li><p>IPC(<code>I</code>nter <code>P</code>rocess <code>C</code>ommunication，跨进程通信)</p>
 <p>泛指一切用于进程间传递信息量（传输数据只是传递信息量的一个子集）的方式，譬如socket/pipe/FIFO/semaphore等。这些名称表征的是信息传输的具体方式，而不涉及信息的处理和加工。</p>
