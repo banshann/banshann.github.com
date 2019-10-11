@@ -166,7 +166,7 @@
             <blockquote>
 <p>本文分析基于Android P(9.0) 源码</p>
 </blockquote>
-<h2 id="1-概述"><a href="#1-概述" class="headerlink" title="1 概述**"></a>1 概述**</h2><p>消息机制是Android中重要的线程间通信手段。</p>
+<h2 id="1-概述"><a href="#1-概述" class="headerlink" title="1 概述"></a><strong>1 概述</strong></h2><p>消息机制是Android中重要的线程间通信手段。</p>
 <p>它的存在可以让一个线程通知另一个线程去工作。那么一个线程为什么会有让另一个线程工作的需求呢？</p>
 <p>可以看一个常见的应用场景——UI更新。Google官方有一句话解释了UI更新的规则：The Android UI toolkit is not thread-safe and the view must always be manipulated on the UI thread。 因为UI更新并不是线程安全的，所以Android为了规避开发者可能的不安全操作，干脆将所有UI更新都放在了主线程中进行。在这种场景下，就会出现其他线程请求主线程来帮忙更新UI的需求。</p>
 <p>除了UI更新，某些设计模式的实现也离不开消息机制。</p>
