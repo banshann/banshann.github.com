@@ -209,6 +209,10 @@ img.thumbnail {
 .article .content a {
   word-wrap: break-word;
 }
+img {
+  margin: auto;
+  display: block;
+}
 .rtl {
   direction: rtl;
 }
