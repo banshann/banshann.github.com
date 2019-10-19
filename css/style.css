@@ -199,15 +199,13 @@ img.thumbnail {
 }
 .article .content {
   font-size: 1.1rem;
+a
 }
 .article .content blockquote.pullquote {
   float: right;
   max-width: 50%;
   font-size: 1.15rem;
   position: relative;
-}
-.article .content a {
-  word-wrap: break-word;
 }
 img {
   margin: auto;
