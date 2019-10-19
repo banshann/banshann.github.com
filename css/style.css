@@ -209,7 +209,7 @@ a
 }
 img {
   margin: auto;
-  display: relative;
+  display: block;
 }
 .rtl {
   direction: rtl;
