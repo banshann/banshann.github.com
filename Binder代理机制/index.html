@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta name="generator" content="Hexo 3.9.0">
+    <meta charset="utf-8">
+<title>Binder代理机制 - 芦半山的博客</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+
+
+    <meta name="description" content="本文分析基于Android P(9.0) 源码  Binder是Android中RPC(Remote Procedure Call)的主要实现机制，它在Android中随处可见，是基石一般的存在。了解Binder的朋友可能都听过代理(Proxy)、引用(Ref)之类的名词，然而关于它们的细节可能未必清楚。 之前在学习Binder的时候，参考过很多书籍和博客。几乎所有文章在谈到如何获取Binder">
+<meta name="keywords" content="Binder,Proxy">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Binder代理机制">
+<meta property="og:url" content="https://banshan.tech/Binder代理机制/index.html">
+<meta property="og:site_name" content="芦半山的博客">
+<meta property="og:description" content="本文分析基于Android P(9.0) 源码  Binder是Android中RPC(Remote Procedure Call)的主要实现机制，它在Android中随处可见，是基石一般的存在。了解Binder的朋友可能都听过代理(Proxy)、引用(Ref)之类的名词，然而关于它们的细节可能未必清楚。 之前在学习Binder的时候，参考过很多书籍和博客。几乎所有文章在谈到如何获取Binder">
+<meta property="og:locale" content="zh-CN">
+<meta property="og:image" content="https://banshan.tech/images/og_image.png">
+<meta property="og:updated_time" content="2019-10-19T11:19:44.292Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Binder代理机制">
+<meta name="twitter:description" content="本文分析基于Android P(9.0) 源码  Binder是Android中RPC(Remote Procedure Call)的主要实现机制，它在Android中随处可见，是基石一般的存在。了解Binder的朋友可能都听过代理(Proxy)、引用(Ref)之类的名词，然而关于它们的细节可能未必清楚。 之前在学习Binder的时候，参考过很多书籍和博客。几乎所有文章在谈到如何获取Binder">
+<meta name="twitter:image" content="https://banshan.tech/images/og_image.png">
+
+
+
+
+
+
+
+<link rel="icon" href="/images/banshan.png">
+
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.7.2/css/bulma.css">
+<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.4.1/css/all.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Ubuntu:400,600|Source+Code+Pro">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@9.12.0/styles/agate.css">
+
+
+    
+    
+    
+    <style>body>.footer,body>.navbar,body>.section{opacity:0}</style>
+    
+
+    
+    
+    
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.6.8/dist/css/lightgallery.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.7.0/dist/css/justifiedGallery.min.css">
+    
+
+    
+    
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/outdatedbrowser@1.1.5/outdatedbrowser/outdatedbrowser.min.css">
+
+
+    
+    
+    
+    
+
+<link rel="stylesheet" href="/css/back-to-top.css">
+
+
+    
+    
+
+    
+    
+    
+    
+
+    
+    
+<link rel="stylesheet" href="/css/progressbar.css">
+<script src="https://cdn.jsdelivr.net/npm/pace-js@1.0.2/pace.min.js"></script>
+
+    
+    
+    
+        <script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    
+
+    
+
+
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="is-2-column">
+    <nav class="navbar navbar-main">
+    <div class="container">
+        <div class="navbar-brand is-flex-center">
+            <a class="navbar-item navbar-logo" href="/">
+            
+                <img src="/images/banshan.png" alt="Binder代理机制" height="28">
+            
+            </a>
+        </div>
+        <div class="navbar-menu">
+            
+            <div class="navbar-start">
+                
+                <a class="navbar-item" href="/">主页</a>
+                
+                <a class="navbar-item" href="/archives">归档</a>
+                
+                <a class="navbar-item" href="/categories">分类</a>
+                
+                <a class="navbar-item" href="/tags">标签</a>
+                
+                <a class="navbar-item" href="/about">关于</a>
+                
+            </div>
+            
+            <div class="navbar-end">
+                
+                
+                <a class="navbar-item is-hidden-tablet catalogue" title="目录" href="javascript:;">
+                    <i class="fas fa-list-ul"></i>
+                </a>
+                
+                
+                <a class="navbar-item search" title="搜索" href="javascript:;">
+                    <i class="fas fa-search"></i>
+                </a>
+                
+            </div>
+        </div>
+    </div>
+</nav>
+    
+    <section class="section">
+        <div class="container">
+            <div class="columns">
+                <div class="column is-10-tablet is-10-desktop is-10-widescreen has-order-2 column-main"><div class="card">
+    
+    <div class="card-content article ">
+        
+        <div class="level article-meta is-size-7 is-uppercase is-mobile is-overflow-x-auto">
+            <div class="level-left">
+                <time class="level-item has-text-grey" datetime="2019-10-19T11:00:00.000Z">2019-10-19</time>
+                
+                <div class="level-item">
+                <a class="has-link-grey -link" href="/categories/Android-Framework/">Android Framework</a>&nbsp;/&nbsp;<a class="has-link-grey -link" href="/categories/Android-Framework/Binder/">Binder</a>
+                </div>
+                
+                
+                
+                <span class="level-item has-text-grey" id="busuanzi_container_page_pv">
+                    <i class="far fa-eye"></i>
+                    <span id="busuanzi_value_page_pv">0</span>次访问
+                </span>
+                
+            </div>
+        </div>
+        
+        <h1 class="title is-size-3 is-size-4-mobile has-text-weight-normal">
+            
+                Binder代理机制
+            
+        </h1>
+        <div class="content">
+            <blockquote>
+<p>本文分析基于Android P(9.0) 源码</p>
+</blockquote>
+<p>Binder是Android中RPC(Remote Procedure Call)的主要实现机制，它在Android中随处可见，是基石一般的存在。了解Binder的朋友可能都听过代理(Proxy)、引用(Ref)之类的名词，然而关于它们的细节可能未必清楚。</p>
+<p>之前在学习Binder的时候，参考过很多书籍和博客。几乎所有文章在谈到如何获取Binder代理对象时，都认为首先需要将service对象注册到ServiceManager中去，之后再由Client进程从ServiceManager中获取它的代理对象。这种说法并没有错，但却不够深入。</p>
+<ol>
+<li>ServiceManager中存储的也是service对象的代理对象，那么（一个service对象的）第一个代理对象到底是如何生成的呢？</li>
+<li>获取Binder代理对象有两种方式，除了通过ServiceManager获取外，还可以通过已有的 Binder通信管道将本端的实体对象（或代理对象）发送到对端，使对端获取到Binder代理对象。</li>
+<li>通过调用一个Binder代理对象的方法，为何可以将数据发送到对端的实体对象？这中间涉及代理对象到实体对象的<strong><a href="https://zh.wikipedia.org/wiki/%E8%B7%AF%E7%94%B1" target="_blank" rel="noopener">路由</a></strong>过程（“路由”用在这里，表示如何从Binder代理对象出发，找到其对应的Binder实体对象），需要详述。【见Binder世界中的代理机制（下）】</li>
+</ol>
+<p>我认为以上这些才是理解“代理”二字的关键。而ServiceManager只是一种集中管理的方式，它通过字符串和Binder代理对象的键值对来记录整个系统中的service，类似于我们上网时的DNS服务器。但本质上说它和“代理”二字并没有必然的关联。</p>
+<a id="more"></a>
+
+<p>所以本文希望通过一个新的视角，将Binder世界中的代理过程和盘托出。</p>
+<p>下面为了方便分析，我们选定ApplicationThread类作为研究对象。</p>
+<p>老子说：“一生二，二生三，三生万物”。那么在Binder的世界中，“一”到底来自何方？</p>
+<h2 id="1-Binder实体对象的出现和意义"><a href="#1-Binder实体对象的出现和意义" class="headerlink" title="1. Binder实体对象的出现和意义"></a>1. Binder实体对象的出现和意义</h2><h3 id="1-1-Binder实体对象是什么？"><a href="#1-1-Binder实体对象是什么？" class="headerlink" title="1.1 Binder实体对象是什么？"></a>1.1 Binder实体对象是什么？</h3><p>所有的RPC（远程过程调用），最终都需要一个实体来根据传输数据执行相应的操作。在Binder的世界中可以将它称为Binder实体对象（名字是我自己斟酌的，可能欠妥，但含义已经表达清楚。看过老罗书和文章的人可能听过“实体对象”、“本地对象”、“引用对象”之类的名字，但我认为那样会增加理解的复杂度，因此这里放弃罗哥的命名方式），表示它才是真正干活的那个人。它就是Binder世界中的“一”，从它创建（在Server进程中被创建）的那一刻起，Binder世界便有了基石。对于ApplicationThread的Binder通信而言，其最终的执行体是位于Java层的ApplicationThread对象。因此在接下来的Binder通信过程中，我们将它称为Binder实体对象。</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/java/android/app/ActivityThread.java#757" target="_blank" rel="noopener">/frameworks/base/core/java/android/app/ActivityThread.java</a></p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">757</span>    <span class="hljs-keyword">private</span> <span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">ApplicationThread</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">IApplicationThread</span>.<span class="hljs-title">Stub</span> </span>&#123;</span><br></pre></td></tr></table></figure>
+
+<h3 id="1-2-Binder实体对象的创建过程"><a href="#1-2-Binder实体对象的创建过程" class="headerlink" title="1.2 Binder实体对象的创建过程"></a>1.2 Binder实体对象的创建过程</h3><p>ApplicationThread继承于IApplicationThread.Stub类。需要注意的是，后面这个类通常并不存在于源码中，而是由AIDL文件编译生成的。IApplicationThread的AIDL文件如下所示：</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/java/android/app/IApplicationThread.aidl" target="_blank" rel="noopener">/frameworks/base/core/java/android/app/IApplicationThread.aidl</a></p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">55</span>oneway <span class="hljs-class"><span class="hljs-keyword">interface</span> <span class="hljs-title">IApplicationThread</span> </span>&#123;</span><br><span class="line"><span class="hljs-number">56</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">scheduleReceiver</span><span class="hljs-params">(in Intent intent, in ActivityInfo info,</span></span></span><br><span class="line"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">57</span>            in CompatibilityInfo compatInfo,</span></span></span><br><span class="line"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">58</span>            <span class="hljs-keyword">int</span> resultCode, in String data, in Bundle extras, <span class="hljs-keyword">boolean</span> sync,</span></span></span><br><span class="line"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">59</span>            <span class="hljs-keyword">int</span> sendingUser, <span class="hljs-keyword">int</span> processState)</span></span>;</span><br><span class="line"><span class="hljs-number">60</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">scheduleCreateService</span><span class="hljs-params">(IBinder token, in ServiceInfo info,</span></span></span><br><span class="line"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">61</span>            in CompatibilityInfo compatInfo, <span class="hljs-keyword">int</span> processState)</span></span>;</span><br><span class="line"><span class="hljs-number">62</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">scheduleStopService</span><span class="hljs-params">(IBinder token)</span></span>;</span><br><span class="line"><span class="hljs-number">63</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">bindApplication</span><span class="hljs-params">(in String packageName, in ApplicationInfo info,</span></span></span><br><span class="line"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">64</span>            in List&lt;ProviderInfo&gt; providers, in ComponentName testName,</span></span></span><br><span class="line"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">65</span>            in ProfilerInfo profilerInfo, in Bundle testArguments,</span></span></span><br><span class="line"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">66</span>            IInstrumentationWatcher testWatcher, IUiAutomationConnection uiAutomationConnection,</span></span></span><br><span class="line"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">67</span>            <span class="hljs-keyword">int</span> debugMode, <span class="hljs-keyword">boolean</span> enableBinderTracking, <span class="hljs-keyword">boolean</span> trackAllocation,</span></span></span><br><span class="line"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">68</span>            <span class="hljs-keyword">boolean</span> restrictedBackupMode, <span class="hljs-keyword">boolean</span> persistent, in Configuration config,</span></span></span><br><span class="line"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">69</span>            in CompatibilityInfo compatInfo, in Map services,</span></span></span><br><span class="line"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">70</span>            in Bundle coreSettings, in String buildSerial, <span class="hljs-keyword">boolean</span> isAutofillCompatEnabled)</span></span>;</span><br><span class="line"><span class="hljs-number">71</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">runIsolatedEntryPoint</span><span class="hljs-params">(in String entryPoint, in String[] entryPointArgs)</span></span>;</span><br><span class="line"><span class="hljs-number">72</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">scheduleExit</span><span class="hljs-params">()</span></span>;</span><br><span class="line"><span class="hljs-number">73</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">scheduleServiceArgs</span><span class="hljs-params">(IBinder token, in ParceledListSlice args)</span></span>;</span><br><span class="line"><span class="hljs-number">74</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">updateTimeZone</span><span class="hljs-params">()</span></span>;</span><br><span class="line"><span class="hljs-number">75</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">processInBackground</span><span class="hljs-params">()</span></span>;</span><br><span class="line"><span class="hljs-number">76</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">scheduleBindService</span><span class="hljs-params">(IBinder token,</span></span></span><br><span class="line"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">77</span>            in Intent intent, <span class="hljs-keyword">boolean</span> rebind, <span class="hljs-keyword">int</span> processState)</span></span>;</span><br><span class="line"><span class="hljs-number">78</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">scheduleUnbindService</span><span class="hljs-params">(IBinder token,</span></span></span><br><span class="line"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">79</span>            in Intent intent)</span></span>;</span><br><span class="line"><span class="hljs-number">80</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">dumpService</span><span class="hljs-params">(in ParcelFileDescriptor fd, IBinder servicetoken,</span></span></span><br><span class="line"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">81</span>            in String[] args)</span></span>;</span><br><span class="line"><span class="hljs-number">82</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">scheduleRegisteredReceiver</span><span class="hljs-params">(IIntentReceiver receiver, in Intent intent,</span></span></span><br><span class="line"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">83</span>            <span class="hljs-keyword">int</span> resultCode, in String data, in Bundle extras, <span class="hljs-keyword">boolean</span> ordered,</span></span></span><br><span class="line"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">84</span>            <span class="hljs-keyword">boolean</span> sticky, <span class="hljs-keyword">int</span> sendingUser, <span class="hljs-keyword">int</span> processState)</span></span>;</span><br><span class="line"><span class="hljs-number">85</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">scheduleLowMemory</span><span class="hljs-params">()</span></span>;</span><br><span class="line"><span class="hljs-number">86</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">scheduleSleeping</span><span class="hljs-params">(IBinder token, <span class="hljs-keyword">boolean</span> sleeping)</span></span>;</span><br><span class="line"><span class="hljs-number">87</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">profilerControl</span><span class="hljs-params">(<span class="hljs-keyword">boolean</span> start, in ProfilerInfo profilerInfo, <span class="hljs-keyword">int</span> profileType)</span></span>;</span><br><span class="line"><span class="hljs-number">88</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">setSchedulingGroup</span><span class="hljs-params">(<span class="hljs-keyword">int</span> group)</span></span>;</span><br><span class="line"><span class="hljs-number">89</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">scheduleCreateBackupAgent</span><span class="hljs-params">(in ApplicationInfo app, in CompatibilityInfo compatInfo,</span></span></span><br><span class="line"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">90</span>            <span class="hljs-keyword">int</span> backupMode)</span></span>;</span><br><span class="line"><span class="hljs-number">91</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">scheduleDestroyBackupAgent</span><span class="hljs-params">(in ApplicationInfo app,</span></span></span><br><span class="line"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">92</span>            in CompatibilityInfo compatInfo)</span></span>;</span><br><span class="line"><span class="hljs-number">93</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">scheduleOnNewActivityOptions</span><span class="hljs-params">(IBinder token, in Bundle options)</span></span>;</span><br><span class="line"><span class="hljs-number">94</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">scheduleSuicide</span><span class="hljs-params">()</span></span>;</span><br><span class="line"><span class="hljs-number">95</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">dispatchPackageBroadcast</span><span class="hljs-params">(<span class="hljs-keyword">int</span> cmd, in String[] packages)</span></span>;</span><br><span class="line"><span class="hljs-number">96</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">scheduleCrash</span><span class="hljs-params">(in String msg)</span></span>;</span><br><span class="line"><span class="hljs-number">97</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">dumpHeap</span><span class="hljs-params">(<span class="hljs-keyword">boolean</span> managed, <span class="hljs-keyword">boolean</span> mallocInfo, <span class="hljs-keyword">boolean</span> runGc, in String path,</span></span></span><br><span class="line"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">98</span>            in ParcelFileDescriptor fd)</span></span>;</span><br><span class="line"><span class="hljs-number">99</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">dumpActivity</span><span class="hljs-params">(in ParcelFileDescriptor fd, IBinder servicetoken, in String prefix,</span></span></span><br><span class="line"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">100</span>            in String[] args)</span></span>;</span><br><span class="line"><span class="hljs-number">101</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">clearDnsCache</span><span class="hljs-params">()</span></span>;</span><br><span class="line"><span class="hljs-number">102</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">setHttpProxy</span><span class="hljs-params">(in String proxy, in String port, in String exclList,</span></span></span><br><span class="line"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">103</span>            in Uri pacFileUrl)</span></span>;</span><br><span class="line"><span class="hljs-number">104</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">setCoreSettings</span><span class="hljs-params">(in Bundle coreSettings)</span></span>;</span><br><span class="line"><span class="hljs-number">105</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">updatePackageCompatibilityInfo</span><span class="hljs-params">(in String pkg, in CompatibilityInfo info)</span></span>;</span><br><span class="line"><span class="hljs-number">106</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">scheduleTrimMemory</span><span class="hljs-params">(<span class="hljs-keyword">int</span> level)</span></span>;</span><br><span class="line"><span class="hljs-number">107</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">dumpMemInfo</span><span class="hljs-params">(in ParcelFileDescriptor fd, in Debug.MemoryInfo mem, <span class="hljs-keyword">boolean</span> checkin,</span></span></span><br><span class="line"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">108</span>            <span class="hljs-keyword">boolean</span> dumpInfo, <span class="hljs-keyword">boolean</span> dumpDalvik, <span class="hljs-keyword">boolean</span> dumpSummaryOnly, <span class="hljs-keyword">boolean</span> dumpUnreachable,</span></span></span><br><span class="line"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">109</span>            in String[] args)</span></span>;</span><br><span class="line"><span class="hljs-number">110</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">dumpMemInfoProto</span><span class="hljs-params">(in ParcelFileDescriptor fd, in Debug.MemoryInfo mem,</span></span></span><br><span class="line"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">111</span>            <span class="hljs-keyword">boolean</span> dumpInfo, <span class="hljs-keyword">boolean</span> dumpDalvik, <span class="hljs-keyword">boolean</span> dumpSummaryOnly, <span class="hljs-keyword">boolean</span> dumpUnreachable,</span></span></span><br><span class="line"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">112</span>            in String[] args)</span></span>;</span><br><span class="line"><span class="hljs-number">113</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">dumpGfxInfo</span><span class="hljs-params">(in ParcelFileDescriptor fd, in String[] args)</span></span>;</span><br><span class="line"><span class="hljs-number">114</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">dumpProvider</span><span class="hljs-params">(in ParcelFileDescriptor fd, IBinder servicetoken,</span></span></span><br><span class="line"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">115</span>            in String[] args)</span></span>;</span><br><span class="line"><span class="hljs-number">116</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">dumpDbInfo</span><span class="hljs-params">(in ParcelFileDescriptor fd, in String[] args)</span></span>;</span><br><span class="line"><span class="hljs-number">117</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">unstableProviderDied</span><span class="hljs-params">(IBinder provider)</span></span>;</span><br><span class="line"><span class="hljs-number">118</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">requestAssistContextExtras</span><span class="hljs-params">(IBinder activityToken, IBinder requestToken,</span></span></span><br><span class="line"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">119</span>            <span class="hljs-keyword">int</span> requestType, <span class="hljs-keyword">int</span> sessionId, <span class="hljs-keyword">int</span> flags)</span></span>;</span><br><span class="line"><span class="hljs-number">120</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">scheduleTranslucentConversionComplete</span><span class="hljs-params">(IBinder token, <span class="hljs-keyword">boolean</span> timeout)</span></span>;</span><br><span class="line"><span class="hljs-number">121</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">setProcessState</span><span class="hljs-params">(<span class="hljs-keyword">int</span> state)</span></span>;</span><br><span class="line"><span class="hljs-number">122</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">scheduleInstallProvider</span><span class="hljs-params">(in ProviderInfo provider)</span></span>;</span><br><span class="line"><span class="hljs-number">123</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">updateTimePrefs</span><span class="hljs-params">(<span class="hljs-keyword">int</span> timeFormatPreference)</span></span>;</span><br><span class="line"><span class="hljs-number">124</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">scheduleEnterAnimationComplete</span><span class="hljs-params">(IBinder token)</span></span>;</span><br><span class="line"><span class="hljs-number">125</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">notifyCleartextNetwork</span><span class="hljs-params">(in <span class="hljs-keyword">byte</span>[] firstPacket)</span></span>;</span><br><span class="line"><span class="hljs-number">126</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">startBinderTracking</span><span class="hljs-params">()</span></span>;</span><br><span class="line"><span class="hljs-number">127</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">stopBinderTrackingAndDump</span><span class="hljs-params">(in ParcelFileDescriptor fd)</span></span>;</span><br><span class="line"><span class="hljs-number">128</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">scheduleLocalVoiceInteractionStarted</span><span class="hljs-params">(IBinder token,</span></span></span><br><span class="line"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">129</span>            IVoiceInteractor voiceInteractor)</span></span>;</span><br><span class="line"><span class="hljs-number">130</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">handleTrustStorageUpdate</span><span class="hljs-params">()</span></span>;</span><br><span class="line"><span class="hljs-number">131</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">attachAgent</span><span class="hljs-params">(String path)</span></span>;</span><br><span class="line"><span class="hljs-number">132</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">scheduleApplicationInfoChanged</span><span class="hljs-params">(in ApplicationInfo ai)</span></span>;</span><br><span class="line"><span class="hljs-number">133</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">setNetworkBlockSeq</span><span class="hljs-params">(<span class="hljs-keyword">long</span> procStateSeq)</span></span>;</span><br><span class="line"><span class="hljs-number">134</span>    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">scheduleTransaction</span><span class="hljs-params">(in ClientTransaction transaction)</span></span>;</span><br><span class="line"><span class="hljs-number">135</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<p>它是一个接口文件。55行的<code>oneway</code>表示利用Binder代理对象进行RPC时，并不需要等待对端进程返回，因此是一次单向（异步）的跨进程通信。IApplicationThread中声明了很多方法，代表该接口所具备的能力。AIDL文件生成的IApplicationThread.java如下所示（只展示了片段），在IApplicationThread接口内部定义了一个抽象类Stub。由于是抽象类，所以它并不需要<strong>全部</strong>实现接口（IApplicationThread）中所声明的方法，而其中关键的方法onTransact只有一个作用：将对端进程传递过来的参数解包，并调用对应的方法执行。此外，抽象类Stub会被ApplicationThread继承，所有真正进行数据处理的方法都在这个子类中定义。</p>
+<p><u><em>IApplicationThread.java（源码编译时自动生成）</em></u></p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">181</span>  <span class="hljs-comment">/** Local-side IPC implementation stub class. */</span></span><br><span class="line"><span class="hljs-number">182</span>  <span class="hljs-keyword">public</span> <span class="hljs-keyword">static</span> <span class="hljs-keyword">abstract</span> <span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Stub</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">android</span>.<span class="hljs-title">os</span>.<span class="hljs-title">Binder</span> <span class="hljs-keyword">implements</span> <span class="hljs-title">android</span>.<span class="hljs-title">app</span>.<span class="hljs-title">IApplicationThread</span></span></span><br><span class="line"><span class="hljs-class">183  </span>&#123;</span><br><span class="line"><span class="hljs-number">184</span>      <span class="hljs-keyword">private</span> <span class="hljs-keyword">static</span> <span class="hljs-keyword">final</span> java.lang.String DESCRIPTOR = <span class="hljs-string">"android.app.IApplicationThread"</span>;</span><br></pre></td></tr></table></figure>
+
+<p>综上，Binder实体对象为ApplicationThread对象，其所属的类在Java层拥有如下所示的继承和实现关系。</p>
+<p><img src="https://raw.githubusercontent.com/banshann/Picbed/master/ApplicationThread%E7%B1%BB%E7%9A%84%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.jpg" alt="ApplicationThread类的继承关系"></p>
+<p>IBinder接口中声明的都是与跨进程通信相关的方法，而IApplicationThread接口中声明的都是ApplicationThread中应该实现的方法（表示ApplicationThread这个类所具备的能力）。由于ApplicationThread最终继承于Binder，所以它兼具了跨进程通信的能力。</p>
+<p>如果ApplicationThread是一个正常的本地类（不需要进行跨进程通信），那么它只需要实现IApplicationThread接口即可，如下图所示。现在之所以继承关系变得复杂，就是为了支持跨进程通信。</p>
+<p><img src="https://raw.githubusercontent.com/banshann/Picbed/master/%E5%A6%82%E6%9E%9CApplicationThread%E6%98%AF%E4%B8%80%E4%B8%AA%E6%9C%AC%E5%9C%B0%E7%B1%BB.jpg" alt="如果ApplicationThread是一个本地类"></p>
+<p>上文中提到，对于ApplicationThread的Binder通信而言，最终执行的实体是ApplicationThread对象。因此，Binder通信的第一步就是创建ApplicationThread对象，而创建这个对象的进程就是Binder通信中所谓的Server进程。</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/java/android/app/ActivityThread.java#757" target="_blank" rel="noopener">/frameworks/base/core/java/android/app/ActivityThread.java</a></p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">254</span>    <span class="hljs-keyword">final</span> ApplicationThread mAppThread = <span class="hljs-keyword">new</span> ApplicationThread();</span><br></pre></td></tr></table></figure>
+
+<p>熟悉Binder的朋友应该知道，最终的跨进程通信是通过Binder Driver完成的。而Binder Driver位于内核空间，Java层的Binder对象无法与其直接沟通，所以必须经由Native层进行中转。在中转的过程中，也会创建一些Native层的C++对象来管理中间状态。</p>
+<p>ApplicationThread继承于IApplicationThread.Stub，IApplicationThread.Stub又继承于Binder，所以在ApplicationThread对象创建的过程中同样会调用Binder的构造方法。</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/java/android/os/Binder.java#402" target="_blank" rel="noopener">/frameworks/base/core/java/android/os/Binder.java</a></p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">402</span>    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-title">Binder</span><span class="hljs-params">()</span> </span>&#123;</span><br><span class="line"><span class="hljs-number">403</span>        mObject = getNativeBBinderHolder();    <span class="hljs-comment">//mObject是Java层Binder对象的一个实例字段</span></span><br><span class="line"><span class="hljs-number">404</span>        NoImagePreloadHolder.sRegistry.registerNativeAllocation(<span class="hljs-keyword">this</span>, mObject);</span><br><span class="line"><span class="hljs-number">405</span></span><br><span class="line"><span class="hljs-number">406</span>        <span class="hljs-keyword">if</span> (FIND_POTENTIAL_LEAKS) &#123;</span><br><span class="line"><span class="hljs-number">407</span>            <span class="hljs-keyword">final</span> Class&lt;? extends Binder&gt; klass = getClass();</span><br><span class="line"><span class="hljs-number">408</span>            <span class="hljs-keyword">if</span> ((klass.isAnonymousClass() || klass.isMemberClass() || klass.isLocalClass()) &amp;&amp;</span><br><span class="line"><span class="hljs-number">409</span>                    (klass.getModifiers() &amp; Modifier.STATIC) == <span class="hljs-number">0</span>) &#123;</span><br><span class="line"><span class="hljs-number">410</span>                Log.w(TAG, <span class="hljs-string">"The following Binder class should be static or leaks might occur: "</span> +</span><br><span class="line"><span class="hljs-number">411</span>                    klass.getCanonicalName());</span><br><span class="line"><span class="hljs-number">412</span>            &#125;</span><br><span class="line"><span class="hljs-number">413</span>        &#125;</span><br><span class="line"><span class="hljs-number">414</span>    &#125;</span><br></pre></td></tr></table></figure>
+
+<p>403行首先通过getNativeBBinderHolder来获取native层的JavaBBinderHolder对象的指针值，其对应的JNI方法如下：</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/jni/android_util_Binder.cpp#896" target="_blank" rel="noopener">frameworks/base/core/jni/android_util_Binder.cpp</a></p>
+<figure class="highlight c++ hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">896</span><span class="hljs-function"><span class="hljs-keyword">static</span> jlong <span class="hljs-title">android_os_Binder_getNativeBBinderHolder</span><span class="hljs-params">(JNIEnv* env, jobject clazz)</span></span></span><br><span class="line"><span class="hljs-function">897</span>&#123;</span><br><span class="line"><span class="hljs-number">898</span>    JavaBBinderHolder* jbh = <span class="hljs-keyword">new</span> JavaBBinderHolder();</span><br><span class="line"><span class="hljs-number">899</span>    <span class="hljs-keyword">return</span> (jlong) jbh;</span><br><span class="line"><span class="hljs-number">900</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<p>898行表示创建一个Native层的JavaBBinderHolder对象，根据类名，我们可以了解到它应该只是一个辅助类。而Native层真正起接力作用的对象还没出现。至此，ApplicationThread对象的创建过程全部完成，除了在Java层创建了一个Binder实体对象外，Native层也创建了一个JavaBBinderHolder对象。</p>
+<p>虽然实体对象创建完毕了，但Binder Driver还没有感知到它的存在。</p>
+<h3 id="1-3-Binder实体对象如何让驱动感知到它的存在？"><a href="#1-3-Binder实体对象如何让驱动感知到它的存在？" class="headerlink" title="1.3 Binder实体对象如何让驱动感知到它的存在？"></a>1.3 Binder实体对象如何让驱动感知到它的存在？</h3><p><strong>接下来是关键的一步，不论是向ServiceManager中注册，还是通过跨进程通信将此Binder实体对象发送给对端进程，都需要经过Parcel对象的writeStrongBinder方法。</strong></p>
+<p>ApplicationThread对象创建出来后，接着会通过跨进程通信发送给对端进程。（这里是一个容易混淆的地方，为了方便理解可以假定这句话中的“跨进程通信”是一个先天存在的渠道，虽然它也是Binder通信，但我们暂时不深究它的来历）</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/java/android/os/Parcel.java#736" target="_blank" rel="noopener">/frameworks/base/core/java/android/os/Parcel.java</a></p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">736</span>    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">final</span> <span class="hljs-keyword">void</span> <span class="hljs-title">writeStrongBinder</span><span class="hljs-params">(IBinder val)</span> </span>&#123;  <span class="hljs-comment">//val是ApplicationThread对象</span></span><br><span class="line"><span class="hljs-number">737</span>        nativeWriteStrongBinder(mNativePtr, val);</span><br><span class="line"><span class="hljs-number">738</span>    &#125;</span><br></pre></td></tr></table></figure>
+
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/jni/android_os_Parcel.cpp#298" target="_blank" rel="noopener">frameworks/base/core/jni/android_os_Parcel.cpp</a></p>
+<figure class="highlight c++ hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">298</span><span class="hljs-function"><span class="hljs-keyword">static</span> <span class="hljs-keyword">void</span> <span class="hljs-title">android_os_Parcel_writeStrongBinder</span><span class="hljs-params">(JNIEnv* env, jclass clazz, jlong nativePtr, jobject object)</span></span></span><br><span class="line"><span class="hljs-function">299</span>&#123;</span><br><span class="line"><span class="hljs-number">300</span>    Parcel* parcel = <span class="hljs-keyword">reinterpret_cast</span>&lt;Parcel*&gt;(nativePtr);</span><br><span class="line"><span class="hljs-number">301</span>    <span class="hljs-keyword">if</span> (parcel != <span class="hljs-literal">NULL</span>) &#123;</span><br><span class="line"><span class="hljs-number">302</span>        <span class="hljs-keyword">const</span> <span class="hljs-keyword">status_t</span> err = parcel-&gt;writeStrongBinder(ibinderForJavaObject(env, object));    <span class="hljs-comment">//此object表示的是Java层的ApplicationThread对象</span></span><br><span class="line"><span class="hljs-number">303</span>        <span class="hljs-keyword">if</span> (err != NO_ERROR) &#123;</span><br><span class="line"><span class="hljs-number">304</span>            signalExceptionForError(env, clazz, err);</span><br><span class="line"><span class="hljs-number">305</span>        &#125;</span><br><span class="line"><span class="hljs-number">306</span>    &#125;</span><br><span class="line"><span class="hljs-number">307</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/jni/android_util_Binder.cpp#690" target="_blank" rel="noopener">frameworks/base/core/jni/android_util_Binder.cpp</a></p>
+<figure class="highlight c++ hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">690</span>sp&lt;IBinder&gt; ibinderForJavaObject(JNIEnv* env, jobject obj)</span><br><span class="line"><span class="hljs-number">691</span>&#123;</span><br><span class="line"><span class="hljs-number">692</span>    <span class="hljs-keyword">if</span> (obj == <span class="hljs-literal">NULL</span>) <span class="hljs-keyword">return</span> <span class="hljs-literal">NULL</span>;</span><br><span class="line"><span class="hljs-number">693</span></span><br><span class="line"><span class="hljs-number">694</span>    <span class="hljs-comment">// Instance of Binder?</span></span><br><span class="line"><span class="hljs-number">695</span>    <span class="hljs-keyword">if</span> (env-&gt;IsInstanceOf(obj, gBinderOffsets.mClass)) &#123;</span><br><span class="line"><span class="hljs-number">696</span>        JavaBBinderHolder* jbh = (JavaBBinderHolder*)</span><br><span class="line"><span class="hljs-number">697</span>            env-&gt;GetLongField(obj, gBinderOffsets.mObject);    <span class="hljs-comment">//取出ApplicationThread对象的mObject字段的值，其在之前构造的时候存储了JavaBBinderHolder对象的指针值</span></span><br><span class="line"><span class="hljs-number">698</span>        <span class="hljs-keyword">return</span> jbh-&gt;get(env, obj);</span><br><span class="line"><span class="hljs-number">699</span>    &#125;</span><br><span class="line"><span class="hljs-number">700</span></span><br><span class="line"><span class="hljs-number">701</span>    <span class="hljs-comment">// Instance of BinderProxy?</span></span><br><span class="line"><span class="hljs-number">702</span>    <span class="hljs-keyword">if</span> (env-&gt;IsInstanceOf(obj, gBinderProxyOffsets.mClass)) &#123;</span><br><span class="line"><span class="hljs-number">703</span>        <span class="hljs-keyword">return</span> getBPNativeData(env, obj)-&gt;mObject;</span><br><span class="line"><span class="hljs-number">704</span>    &#125;</span><br><span class="line"><span class="hljs-number">705</span></span><br><span class="line"><span class="hljs-number">706</span>    ALOGW(<span class="hljs-string">"ibinderForJavaObject: %p is not a Binder object"</span>, obj);</span><br><span class="line"><span class="hljs-number">707</span>    <span class="hljs-keyword">return</span> <span class="hljs-literal">NULL</span>;</span><br><span class="line"><span class="hljs-number">708</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<p>696获得的JavaBBinderHolder对象是在ApplicationThread对象构造时创建的。而JavaBBinderHolder对象内部的成员变量最终在698行的get方法中完成真正的赋值。</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/jni/android_util_Binder.cpp#396" target="_blank" rel="noopener">frameworks/base/core/jni/android_util_Binder.cpp</a></p>
+<figure class="highlight c++ hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">396</span>    sp&lt;JavaBBinder&gt; get(JNIEnv* env, jobject obj)</span><br><span class="line"><span class="hljs-number">397</span>    &#123;</span><br><span class="line"><span class="hljs-number">398</span>        AutoMutex _l(mLock);</span><br><span class="line"><span class="hljs-number">399</span>        sp&lt;JavaBBinder&gt; b = mBinder.promote();    <span class="hljs-comment">//此时JavaBBinderHolder对象的mBinder变量promote后为NULL</span></span><br><span class="line"><span class="hljs-number">400</span>        <span class="hljs-keyword">if</span> (b == <span class="hljs-literal">NULL</span>) &#123;</span><br><span class="line"><span class="hljs-number">401</span>            b = <span class="hljs-keyword">new</span> JavaBBinder(env, obj);    <span class="hljs-comment">//构造一个新的JavaBBinder(c++)对象，obj是ApplicationThread(java)对象</span></span><br><span class="line"><span class="hljs-number">402</span>            mBinder = b;</span><br><span class="line"><span class="hljs-number">403</span>            ALOGV(<span class="hljs-string">"Creating JavaBinder %p (refs %p) for Object %p, weakCount=%"</span> PRId32 <span class="hljs-string">"\n"</span>,</span><br><span class="line"><span class="hljs-number">404</span>                 b.get(), b-&gt;getWeakRefs(), obj, b-&gt;getWeakRefs()-&gt;getWeakCount());</span><br><span class="line"><span class="hljs-number">405</span>        &#125;</span><br><span class="line"><span class="hljs-number">406</span></span><br><span class="line"><span class="hljs-number">407</span>        <span class="hljs-keyword">return</span> b;</span><br><span class="line"><span class="hljs-number">408</span>    &#125;</span><br></pre></td></tr></table></figure>
+
+<p>401行根据ApplicationThread(Java层)对象构造出一个新的JavaBBinder(Native层)对象。然后402行将它赋值给JavaBBinderHolder对象的mBinder变量。</p>
+<p>接下来看看这个新创建的JavaBBinder对象到底是什么来历。它继承于BBinder类，并且持有了ApplicationThread对象的JNI全局引用。</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/jni/android_util_Binder.cpp#301" target="_blank" rel="noopener">frameworks/base/core/jni/android_util_Binder.cpp</a></p>
+<figure class="highlight c++ hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">301</span>class JavaBBinder : <span class="hljs-keyword">public</span> BBinder</span><br><span class="line"><span class="hljs-number">302</span>&#123;</span><br><span class="line"><span class="hljs-number">303</span><span class="hljs-keyword">public</span>:</span><br><span class="line"><span class="hljs-number">304</span>    JavaBBinder(JNIEnv* env, jobject <span class="hljs-comment">/* Java Binder */</span> object)</span><br><span class="line"><span class="hljs-number">305</span>        : mVM(jnienv_to_javavm(env)), mObject(env-&gt;NewGlobalRef(object))</span><br><span class="line"><span class="hljs-number">306</span>    &#123;</span><br><span class="line"><span class="hljs-number">307</span>        ALOGV(<span class="hljs-string">"Creating JavaBBinder %p\n"</span>, <span class="hljs-keyword">this</span>);</span><br><span class="line"><span class="hljs-number">308</span>        gNumLocalRefsCreated.fetch_add(<span class="hljs-number">1</span>, <span class="hljs-built_in">std</span>::memory_order_relaxed);</span><br><span class="line"><span class="hljs-number">309</span>        gcIfManyNewRefs(env);</span><br><span class="line"><span class="hljs-number">310</span>    &#125;</span><br></pre></td></tr></table></figure>
+
+<p>因此在writeStrongBinder的初期，又创建了新的Native层对象：JavaBBinder对象，并将它交由JavaBBinderHolder对象持有。以下图例展示了它的持有和继承关系。</p>
+<p><img src="https://raw.githubusercontent.com/banshann/Picbed/master/Binder%E5%AE%9E%E4%BD%93%E5%AF%B9%E8%B1%A1Native%E5%B1%82%E7%9A%84%E4%B8%AD%E9%97%B4%E5%BD%A2%E6%80%81.jpg" alt="Binder实体对象Native层的中间形态"></p>
+<p>至此，Binder实体对象及其有关的两个Native层对象均已创建完成，它们分别是Jave层的ApplicationThread对象、Native层的JavaBBinderHolder对象以及Native层的JavaBBinder对象。JavaBBinder对象的mObject字段记录了ApplicationThread对象的信息，所以一旦找到JavaBBinder对象，便可以通过其mObject字段调用其Java对象的方法。下图展示了三个对象之间的关系。</p>
+<p><img src="https://raw.githubusercontent.com/banshann/Picbed/master/Binder%E5%AE%9E%E4%BD%93%E5%AF%B9%E8%B1%A1%E5%92%8CNative%E5%B1%82%E4%B8%AD%E9%97%B4%E5%BD%A2%E6%80%81%E7%9A%84%E5%85%B3%E7%B3%BB.jpg" alt="Binder实体对象和Native层中间形态的关系"></p>
+<p>接下来再回到writeStrongBinder的过程，ibinderForJavaObject返回的是刚刚创建的JavaBBinder对象。</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/jni/android_os_Parcel.cpp#298" target="_blank" rel="noopener">frameworks/base/core/jni/android_os_Parcel.cpp</a></p>
+<figure class="highlight c++ hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">298</span><span class="hljs-function"><span class="hljs-keyword">static</span> <span class="hljs-keyword">void</span> <span class="hljs-title">android_os_Parcel_writeStrongBinder</span><span class="hljs-params">(JNIEnv* env, jclass clazz, jlong nativePtr, jobject object)</span></span></span><br><span class="line"><span class="hljs-function">299</span>&#123;</span><br><span class="line"><span class="hljs-number">300</span>    Parcel* parcel = <span class="hljs-keyword">reinterpret_cast</span>&lt;Parcel*&gt;(nativePtr);</span><br><span class="line"><span class="hljs-number">301</span>    <span class="hljs-keyword">if</span> (parcel != <span class="hljs-literal">NULL</span>) &#123;</span><br><span class="line"><span class="hljs-number">302</span>        <span class="hljs-keyword">const</span> <span class="hljs-keyword">status_t</span> err = parcel-&gt;writeStrongBinder(ibinderForJavaObject(env, object));    <span class="hljs-comment">//此object表示的是Java层的ApplicationThread对象</span></span><br><span class="line"><span class="hljs-number">303</span>        <span class="hljs-keyword">if</span> (err != NO_ERROR) &#123;</span><br><span class="line"><span class="hljs-number">304</span>            signalExceptionForError(env, clazz, err);</span><br><span class="line"><span class="hljs-number">305</span>        &#125;</span><br><span class="line"><span class="hljs-number">306</span>    &#125;</span><br><span class="line"><span class="hljs-number">307</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/native/libs/binder/Parcel.cpp#1082" target="_blank" rel="noopener">/frameworks/native/libs/binder/Parcel.cpp</a></p>
+<figure class="highlight c++ hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-keyword">1082status_t</span> Parcel::writeStrongBinder(<span class="hljs-keyword">const</span> sp&lt;IBinder&gt;&amp; val)</span><br><span class="line"><span class="hljs-number">1083</span>&#123;</span><br><span class="line"><span class="hljs-number">1084</span>    <span class="hljs-keyword">return</span> flatten_binder(ProcessState::self(), val, <span class="hljs-keyword">this</span>);</span><br><span class="line"><span class="hljs-number">1085</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/native/libs/binder/Parcel.cpp#209" target="_blank" rel="noopener">/frameworks/native/libs/binder/Parcel.cpp</a></p>
+<figure class="highlight c++ hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-keyword">209status_t</span> flatten_binder(<span class="hljs-keyword">const</span> sp&lt;ProcessState&gt;&amp; <span class="hljs-comment">/*proc*/</span>,</span><br><span class="line"><span class="hljs-number">210</span>    <span class="hljs-keyword">const</span> sp&lt;IBinder&gt;&amp; binder, Parcel* out)</span><br><span class="line"><span class="hljs-number">211</span>&#123;</span><br><span class="line"><span class="hljs-number">212</span>    flat_binder_object obj;</span><br><span class="line"><span class="hljs-number">213</span></span><br><span class="line"><span class="hljs-number">214</span>    <span class="hljs-keyword">if</span> (IPCThreadState::self()-&gt;backgroundSchedulingDisabled()) &#123;</span><br><span class="line"><span class="hljs-number">215</span>        <span class="hljs-comment">/* minimum priority for all nodes is nice 0 */</span></span><br><span class="line"><span class="hljs-number">216</span>        obj.flags = FLAT_BINDER_FLAG_ACCEPTS_FDS;</span><br><span class="line"><span class="hljs-number">217</span>    &#125; <span class="hljs-keyword">else</span> &#123;</span><br><span class="line"><span class="hljs-number">218</span>        <span class="hljs-comment">/* minimum priority for all nodes is MAX_NICE(19) */</span></span><br><span class="line"><span class="hljs-number">219</span>        obj.flags = <span class="hljs-number">0x13</span> | FLAT_BINDER_FLAG_ACCEPTS_FDS;</span><br><span class="line"><span class="hljs-number">220</span>    &#125;</span><br><span class="line"><span class="hljs-number">221</span></span><br><span class="line"><span class="hljs-number">222</span>    <span class="hljs-keyword">if</span> (binder != <span class="hljs-literal">NULL</span>) &#123;</span><br><span class="line"><span class="hljs-number">223</span>        IBinder *local = binder-&gt;localBinder();	<span class="hljs-comment">//对于JavaBBinder对象而言，其localBinder成员函数获取到的是this指针</span></span><br><span class="line"><span class="hljs-number">224</span>        <span class="hljs-keyword">if</span> (!local) &#123;   <span class="hljs-comment">//这是BinderProxy走的分支</span></span><br><span class="line"><span class="hljs-number">225</span>            BpBinder *proxy = binder-&gt;remoteBinder();</span><br><span class="line"><span class="hljs-number">226</span>            <span class="hljs-keyword">if</span> (proxy == <span class="hljs-literal">NULL</span>) &#123;</span><br><span class="line"><span class="hljs-number">227</span>                ALOGE(<span class="hljs-string">"null proxy"</span>);</span><br><span class="line"><span class="hljs-number">228</span>            &#125;</span><br><span class="line"><span class="hljs-number">229</span>            <span class="hljs-keyword">const</span> <span class="hljs-keyword">int32_t</span> handle = proxy ? proxy-&gt;handle() : <span class="hljs-number">0</span>;</span><br><span class="line"><span class="hljs-number">230</span>            obj.hdr.type = BINDER_TYPE_HANDLE;</span><br><span class="line"><span class="hljs-number">231</span>            obj.binder = <span class="hljs-number">0</span>; <span class="hljs-comment">/* Don't pass uninitialized stack data to a remote process */</span></span><br><span class="line"><span class="hljs-number">232</span>            obj.handle = handle;</span><br><span class="line"><span class="hljs-number">233</span>            obj.cookie = <span class="hljs-number">0</span>;</span><br><span class="line"><span class="hljs-number">234</span>        &#125; <span class="hljs-keyword">else</span> &#123;		<span class="hljs-comment">//这才是JavaBBinder走的分支</span></span><br><span class="line"><span class="hljs-number">235</span>            obj.hdr.type = BINDER_TYPE_BINDER;</span><br><span class="line"><span class="hljs-number">236</span>            obj.binder = <span class="hljs-keyword">reinterpret_cast</span>&lt;<span class="hljs-keyword">uintptr_t</span>&gt;(local-&gt;getWeakRefs());</span><br><span class="line"><span class="hljs-number">237</span>            obj.cookie = <span class="hljs-keyword">reinterpret_cast</span>&lt;<span class="hljs-keyword">uintptr_t</span>&gt;(local);</span><br><span class="line"><span class="hljs-number">238</span>        &#125;</span><br><span class="line"><span class="hljs-number">239</span>    &#125; <span class="hljs-keyword">else</span> &#123;</span><br><span class="line"><span class="hljs-number">240</span>        obj.hdr.type = BINDER_TYPE_BINDER;</span><br><span class="line"><span class="hljs-number">241</span>        obj.binder = <span class="hljs-number">0</span>;</span><br><span class="line"><span class="hljs-number">242</span>        obj.cookie = <span class="hljs-number">0</span>;</span><br><span class="line"><span class="hljs-number">243</span>    &#125;</span><br><span class="line"><span class="hljs-number">244</span></span><br><span class="line"><span class="hljs-number">245</span>    <span class="hljs-keyword">return</span> finish_flatten_binder(binder, obj, out);</span><br><span class="line"><span class="hljs-number">246</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<p>将这个JavaBBinder对象flatten后，便会加入到Parcel对象mOut中，预示着它将被发送到对端进程。此对象存放在mOut中的位置我们先不深究，接下来深入到Binder Driver中，看看驱动发现传输数据中有JavaBBinder对象后，将会如何处理。</p>
+<p>Android P采用的Linux kernel版本为4.14。对于一次Binder通信而言，通信发起进程最终会调用Binder Driver的binder_transaction函数。其中会遍历mOut中存放的所有flat_binder_object，并进行相应的处理。</p>
+<p>*<u>/kernel/msm-4.14/drivers/android/binder.c</u>*</p>
+<figure class="highlight c hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">3187</span> 	<span class="hljs-keyword">for</span> (; offp &lt; off_end; offp++) &#123;</span><br><span class="line"><span class="hljs-number">3188</span> 		<span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">binder_object_header</span> *<span class="hljs-title">hdr</span>;</span></span><br><span class="line"><span class="hljs-number">3189</span> 		<span class="hljs-keyword">size_t</span> object_size = binder_validate_object(t-&gt;buffer, *offp);</span><br><span class="line"><span class="hljs-number">3190</span> </span><br><span class="line"><span class="hljs-number">3191</span> 		<span class="hljs-keyword">if</span> (object_size == <span class="hljs-number">0</span> || *offp &lt; off_min) &#123;</span><br><span class="line"><span class="hljs-number">3192</span> 			binder_user_error(<span class="hljs-string">"%d:%d got transaction with invalid offset (%lld, min %lld max %lld) or object.\n"</span>,</span><br><span class="line"><span class="hljs-number">3193</span> 					  proc-&gt;pid, thread-&gt;pid, (u64)*offp,</span><br><span class="line"><span class="hljs-number">3194</span> 					  (u64)off_min,</span><br><span class="line"><span class="hljs-number">3195</span> 					  (u64)t-&gt;buffer-&gt;data_size);</span><br><span class="line"><span class="hljs-number">3196</span> 			return_error = BR_FAILED_REPLY;</span><br><span class="line"><span class="hljs-number">3197</span> 			return_error_param = -EINVAL;</span><br><span class="line"><span class="hljs-number">3198</span> 			return_error_line = __LINE__;</span><br><span class="line"><span class="hljs-number">3199</span> 			<span class="hljs-keyword">goto</span> err_bad_offset;</span><br><span class="line"><span class="hljs-number">3200</span> 		&#125;</span><br><span class="line"><span class="hljs-number">3201</span> </span><br><span class="line"><span class="hljs-number">3202</span> 		hdr = (struct binder_object_header *)(t-&gt;buffer-&gt;data + *offp);</span><br><span class="line"><span class="hljs-number">3203</span> 		off_min = *offp + object_size;</span><br><span class="line"><span class="hljs-number">3204</span> 		<span class="hljs-keyword">switch</span> (hdr-&gt;type) &#123;</span><br><span class="line"><span class="hljs-number">3205</span> 		<span class="hljs-keyword">case</span> BINDER_TYPE_BINDER:</span><br><span class="line"><span class="hljs-number">3206</span> 		<span class="hljs-keyword">case</span> BINDER_TYPE_WEAK_BINDER: &#123;		<span class="hljs-comment">//对于JavaBBinder而言，type为BINDER_TYPE_BINDER</span></span><br><span class="line"><span class="hljs-number">3207</span> 			<span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">flat_binder_object</span> *<span class="hljs-title">fp</span>;</span></span><br><span class="line"><span class="hljs-number">3208</span> </span><br><span class="line"><span class="hljs-number">3209</span> 			fp = to_flat_binder_object(hdr);	<span class="hljs-comment">//根据header得到对应的flat_binder_object</span></span><br><span class="line"><span class="hljs-number">3210</span> 			ret = binder_translate_binder(fp, t, thread);	<span class="hljs-comment">//这是至关重要的一步</span></span><br><span class="line"><span class="hljs-number">3211</span> 			<span class="hljs-keyword">if</span> (ret &lt; <span class="hljs-number">0</span>) &#123;</span><br><span class="line"><span class="hljs-number">3212</span> 				return_error = BR_FAILED_REPLY;</span><br><span class="line"><span class="hljs-number">3213</span> 				return_error_param = ret;</span><br><span class="line"><span class="hljs-number">3214</span> 				return_error_line = __LINE__;</span><br><span class="line"><span class="hljs-number">3215</span> 				<span class="hljs-keyword">goto</span> err_translate_failed;</span><br><span class="line"><span class="hljs-number">3216</span> 			&#125;</span><br><span class="line"><span class="hljs-number">3217</span> 		&#125; <span class="hljs-keyword">break</span>;</span><br></pre></td></tr></table></figure>
+
+<p>在binder_translate_binder中，首先会根据binder_flat_object创建一个内核空间的binder_node对象。它是Binder实体对象在内核空间的中间形态，同时为了建立和用户空间对象的联系，它用cookie字段记录了用户空间JavaBBinder对象的指针值。下图展示了Binder实体对象和Native层中间形态及Kernel层中间形态的关系。</p>
+<p><img src="https://raw.githubusercontent.com/banshann/Picbed/master/Binder%E5%AE%9E%E4%BD%93%E5%AF%B9%E8%B1%A1%E5%92%8C%E6%89%80%E6%9C%89%E4%B8%AD%E9%97%B4%E5%BD%A2%E6%80%81%E7%9A%84%E5%85%B3%E7%B3%BB.jpg" alt="Binder实体对象和所有中间形态的关系"></p>
+<p>至此，Binder实体对象及其在各层的中间形态都已经创建完毕。接下来看看Binder代理对象是如何被创建的。</p>
+<h2 id="2-Binder代理对象的创建过程"><a href="#2-Binder代理对象的创建过程" class="headerlink" title="2. Binder代理对象的创建过程"></a>2. Binder代理对象的创建过程</h2><p>所谓Binder代理对象，就是一次RPC发起时，应用开发者所能够知道的唯一入口。譬如通过IApplicationThread.bindApplication方法来发起一次RPC时，那么IApplicationThread对象就是Binder代理对象。</p>
+<h3 id="2-1-Binder代理对象在内核空间的中间形态"><a href="#2-1-Binder代理对象在内核空间的中间形态" class="headerlink" title="2.1 Binder代理对象在内核空间的中间形态"></a>2.1 Binder代理对象在内核空间的中间形态</h3><p>再次回到binder_translate_binder中，看看驱动得知传进来的是一个Binder实体对象后将会做哪些处理。</p>
+<p>*<u>/kernel/msm-4.14/drivers/android/binder.c</u>*</p>
+<figure class="highlight c hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">2479</span> <span class="hljs-function"><span class="hljs-keyword">static</span> <span class="hljs-keyword">int</span> <span class="hljs-title">binder_translate_binder</span><span class="hljs-params">(struct flat_binder_object *fp,</span></span></span><br><span class="line"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">2480</span> 				   struct binder_transaction *t,</span></span></span><br><span class="line"><span class="hljs-function"><span class="hljs-params"><span class="hljs-number">2481</span> 				   struct binder_thread *thread)</span></span></span><br><span class="line"><span class="hljs-function">2482 </span>&#123;</span><br><span class="line"><span class="hljs-number">2483</span> 	<span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">binder_node</span> *<span class="hljs-title">node</span>;</span></span><br><span class="line"><span class="hljs-number">2484</span> 	<span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">binder_proc</span> *<span class="hljs-title">proc</span> = <span class="hljs-title">thread</span>-&gt;<span class="hljs-title">proc</span>;</span></span><br><span class="line"><span class="hljs-number">2485</span> 	<span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">binder_proc</span> *<span class="hljs-title">target_proc</span> = <span class="hljs-title">t</span>-&gt;<span class="hljs-title">to_proc</span>;</span></span><br><span class="line"><span class="hljs-number">2486</span> 	<span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">binder_ref_data</span> <span class="hljs-title">rdata</span>;</span></span><br><span class="line"><span class="hljs-number">2487</span> 	<span class="hljs-keyword">int</span> ret = <span class="hljs-number">0</span>;</span><br><span class="line"><span class="hljs-number">2488</span> </span><br><span class="line"><span class="hljs-number">2489</span> 	node = binder_get_node(proc, fp-&gt;binder);</span><br><span class="line"><span class="hljs-number">2490</span> 	<span class="hljs-keyword">if</span> (!node) &#123;</span><br><span class="line"><span class="hljs-number">2491</span> 		node = binder_new_node(proc, fp);	<span class="hljs-comment">//创建一个新的binder_node对象</span></span><br><span class="line"><span class="hljs-number">2492</span> 		<span class="hljs-keyword">if</span> (!node)</span><br><span class="line"><span class="hljs-number">2493</span> 			<span class="hljs-keyword">return</span> -ENOMEM;</span><br><span class="line"><span class="hljs-number">2494</span> 	&#125;</span><br><span class="line"><span class="hljs-number">2495</span> 	<span class="hljs-keyword">if</span> (fp-&gt;cookie != node-&gt;cookie) &#123;</span><br><span class="line"><span class="hljs-number">2496</span> 		binder_user_error(<span class="hljs-string">"%d:%d sending u%016llx node %d, cookie mismatch %016llx != %016llx\n"</span>,</span><br><span class="line"><span class="hljs-number">2497</span> 				  proc-&gt;pid, thread-&gt;pid, (u64)fp-&gt;binder,</span><br><span class="line"><span class="hljs-number">2498</span> 				  node-&gt;debug_id, (u64)fp-&gt;cookie,</span><br><span class="line"><span class="hljs-number">2499</span> 				  (u64)node-&gt;cookie);</span><br><span class="line"><span class="hljs-number">2500</span> 		ret = -EINVAL;</span><br><span class="line"><span class="hljs-number">2501</span> 		<span class="hljs-keyword">goto</span> done;</span><br><span class="line"><span class="hljs-number">2502</span> 	&#125;</span><br><span class="line"><span class="hljs-number">2503</span> 	<span class="hljs-keyword">if</span> (security_binder_transfer_binder(proc-&gt;tsk, target_proc-&gt;tsk)) &#123;</span><br><span class="line"><span class="hljs-number">2504</span> 		ret = -EPERM;</span><br><span class="line"><span class="hljs-number">2505</span> 		<span class="hljs-keyword">goto</span> done;</span><br><span class="line"><span class="hljs-number">2506</span> 	&#125;</span><br><span class="line"><span class="hljs-number">2507</span> </span><br><span class="line"><span class="hljs-number">2508</span> 	ret = binder_inc_ref_for_node(target_proc, node,</span><br><span class="line"><span class="hljs-number">2509</span> 			fp-&gt;hdr.type == BINDER_TYPE_BINDER,</span><br><span class="line"><span class="hljs-number">2510</span> 			&amp;thread-&gt;todo, &amp;rdata);		<span class="hljs-comment">//这里会为对端进程创建一个binder_ref对象，它是Binder代理对象在内核空间里的中间形态</span></span><br><span class="line"><span class="hljs-number">2511</span> 	<span class="hljs-keyword">if</span> (ret)</span><br><span class="line"><span class="hljs-number">2512</span> 		<span class="hljs-keyword">goto</span> done;</span><br><span class="line"><span class="hljs-number">2513</span> </span><br><span class="line"><span class="hljs-number">2514</span> 	<span class="hljs-keyword">if</span> (fp-&gt;hdr.type == BINDER_TYPE_BINDER)</span><br><span class="line"><span class="hljs-number">2515</span> 		fp-&gt;hdr.type = BINDER_TYPE_HANDLE;	<span class="hljs-comment">//这里完成了“移花接木”</span></span><br><span class="line"><span class="hljs-number">2516</span> 	<span class="hljs-keyword">else</span></span><br><span class="line"><span class="hljs-number">2517</span> 		fp-&gt;hdr.type = BINDER_TYPE_WEAK_HANDLE;</span><br><span class="line"><span class="hljs-number">2518</span> 	fp-&gt;binder = <span class="hljs-number">0</span>;</span><br><span class="line"><span class="hljs-number">2519</span> 	fp-&gt;handle = rdata.desc;</span><br><span class="line"><span class="hljs-number">2520</span> 	fp-&gt;cookie = <span class="hljs-number">0</span>;</span><br><span class="line"><span class="hljs-number">2521</span> </span><br><span class="line"><span class="hljs-number">2522</span> 	trace_binder_transaction_node_to_ref(t, node, &amp;rdata);</span><br><span class="line"><span class="hljs-number">2523</span> 	binder_debug(BINDER_DEBUG_TRANSACTION,</span><br><span class="line"><span class="hljs-number">2524</span> 		     <span class="hljs-string">"        node %d u%016llx -&gt; ref %d desc %d\n"</span>,</span><br><span class="line"><span class="hljs-number">2525</span> 		     node-&gt;debug_id, (u64)node-&gt;ptr,</span><br><span class="line"><span class="hljs-number">2526</span> 		     rdata.debug_id, rdata.desc);</span><br><span class="line"><span class="hljs-number">2527</span> done:</span><br><span class="line"><span class="hljs-number">2528</span> 	binder_put_node(node);</span><br><span class="line"><span class="hljs-number">2529</span> 	<span class="hljs-keyword">return</span> ret;</span><br><span class="line"><span class="hljs-number">2530</span> &#125;</span><br></pre></td></tr></table></figure>
+
+<p>2515是最为关键的一步。虽然在Binder实体对象创建的进程中，我们通过binder_transaction函数意图往对端进程发送一个type为BINDER_TYPE_BINDER的Binder对象（意味着这是一个Binder实体对象），但在2515行却将type改为了BINDER_TYPE_HANDLE。这样一来，对端进程就知道自己接收了一个Binder代理对象。此外，2518行和2520行会分别将flat_binder_object的binder字段和cookie字段置为0，因为这两个字段只有当flat_binder_object表示一个Binder实体对象时才需要，而对端进程接收到flat_binder_object后会将它认为是一个Binder代理对象。</p>
+<p>2508行会为对端进程创建一个binder_ref对象，它是Binder代理对象在kernel层的中间形态。其中一个重要的数据便是binder_ref对象的data.desc，它是一个由驱动分配的数字。对于每个进程而言，这个数字会从1开始不断增大，保证每一个binder_ref对象都会拥有一个独一无二的标识。这个数字就是大家经常说的handle值，是用户空间里每个Binder代理对象的“身份证号码”。</p>
+<p>*<u>/kernel/msm-4.14/drivers/android/binder.c</u>*</p>
+<figure class="highlight c hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">449</span> <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">binder_ref</span> &#123;</span></span><br><span class="line"><span class="hljs-number">450</span> 	<span class="hljs-comment">/* Lookups needed: */</span></span><br><span class="line"><span class="hljs-number">451</span> 	<span class="hljs-comment">/*   node + proc =&gt; ref (transaction) */</span></span><br><span class="line"><span class="hljs-number">452</span> 	<span class="hljs-comment">/*   desc + proc =&gt; ref (transaction, inc/dec ref) */</span></span><br><span class="line"><span class="hljs-number">453</span> 	<span class="hljs-comment">/*   node =&gt; refs + procs (proc exit) */</span></span><br><span class="line"><span class="hljs-number">454</span> 	<span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">binder_ref_data</span> <span class="hljs-title">data</span>;</span></span><br><span class="line"><span class="hljs-number">455</span> 	<span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">rb_node</span> <span class="hljs-title">rb_node_desc</span>;</span></span><br><span class="line"><span class="hljs-number">456</span> 	<span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">rb_node</span> <span class="hljs-title">rb_node_node</span>;</span></span><br><span class="line"><span class="hljs-number">457</span> 	<span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">hlist_node</span> <span class="hljs-title">node_entry</span>;</span></span><br><span class="line"><span class="hljs-number">458</span> 	<span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">binder_proc</span> *<span class="hljs-title">proc</span>;</span></span><br><span class="line"><span class="hljs-number">459</span> 	<span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">binder_node</span> *<span class="hljs-title">node</span>;</span></span><br><span class="line"><span class="hljs-number">460</span> 	<span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">binder_ref_death</span> *<span class="hljs-title">death</span>;</span></span><br><span class="line"><span class="hljs-number">461</span> &#125;;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight c hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">425</span> <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">binder_ref_data</span> &#123;</span></span><br><span class="line"><span class="hljs-number">426</span> 	<span class="hljs-keyword">int</span> debug_id;</span><br><span class="line"><span class="hljs-number">427</span> 	<span class="hljs-keyword">uint32_t</span> desc;</span><br><span class="line"><span class="hljs-number">428</span> 	<span class="hljs-keyword">int</span> strong;</span><br><span class="line"><span class="hljs-number">429</span> 	<span class="hljs-keyword">int</span> weak;</span><br><span class="line"><span class="hljs-number">430</span> &#125;;</span><br></pre></td></tr></table></figure>
+
+<p>这样一来，在对端进程真正处理此次Binder通信之前，驱动已经为对端进程创建了Binder代理对象在内核空间中的中间形态: binder_ref对象。</p>
+<p>至此，以上所有的操作都在同一个进程中。接下来视角将会切换到对端进程，它在接收到Binder通信请求后，会从Binder Driver中被唤醒过来。</p>
+<h3 id="2-2-Binder代理对象在Native层的中间形态"><a href="#2-2-Binder代理对象在Native层的中间形态" class="headerlink" title="2.2 Binder代理对象在Native层的中间形态"></a>2.2 Binder代理对象在Native层的中间形态</h3><p>对端进程接收到数据后，会一层层往上传，最终交由上层处理。这里假设最终的处理方法如下：</p>
+<p>*<u>IActivityManager.java (编译过程中，根据AIDL文件生成)</u>*</p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">1</span>     <span class="hljs-keyword">case</span> TRANSACTION_bindService:</span><br><span class="line"><span class="hljs-number">2</span>     &#123;</span><br><span class="line"><span class="hljs-number">3</span>       data.enforceInterface(descriptor);</span><br><span class="line"><span class="hljs-number">4</span>       android.app.IApplicationThread _arg0;</span><br><span class="line"><span class="hljs-number">5</span>       _arg0 = android.app.IApplicationThread.Stub.asInterface(data.readStrongBinder());</span><br><span class="line"><span class="hljs-number">6</span>       android.os.IBinder _arg1;</span><br><span class="line"><span class="hljs-number">7</span>       _arg1 = data.readStrongBinder();</span><br><span class="line"><span class="hljs-number">8</span>       android.content.Intent _arg2;</span><br><span class="line"><span class="hljs-number">9</span>       <span class="hljs-keyword">if</span> ((<span class="hljs-number">0</span>!=data.readInt())) &#123;</span><br><span class="line"><span class="hljs-number">10</span>        _arg2 = android.content.Intent.CREATOR.createFromParcel(data);</span><br><span class="line"><span class="hljs-number">11</span>      &#125;</span><br><span class="line"><span class="hljs-number">12</span>      <span class="hljs-keyword">else</span> &#123;</span><br><span class="line"><span class="hljs-number">13</span>        _arg2 = <span class="hljs-keyword">null</span>;</span><br><span class="line"><span class="hljs-number">14</span>      &#125;</span><br><span class="line"><span class="hljs-number">15</span>      java.lang.String _arg3;</span><br><span class="line"><span class="hljs-number">16</span>      _arg3 = data.readString();</span><br><span class="line"><span class="hljs-number">17</span>      android.app.IServiceConnection _arg4;</span><br><span class="line"><span class="hljs-number">18</span>      _arg4 = android.app.IServiceConnection.Stub.asInterface(data.readStrongBinder());</span><br><span class="line"><span class="hljs-number">19</span>      <span class="hljs-keyword">int</span> _arg5;</span><br><span class="line"><span class="hljs-number">20</span>      _arg5 = data.readInt();</span><br><span class="line"><span class="hljs-number">21</span>      java.lang.String _arg6;</span><br><span class="line"><span class="hljs-number">22</span>      _arg6 = data.readString();</span><br><span class="line"><span class="hljs-number">23</span>      <span class="hljs-keyword">int</span> _arg7;</span><br><span class="line"><span class="hljs-number">24</span>      _arg7 = data.readInt();</span><br><span class="line"><span class="hljs-number">25</span>      <span class="hljs-keyword">int</span> _result = <span class="hljs-keyword">this</span>.bindService(_arg0, _arg1, _arg2, _arg3, _arg4, _arg5, _arg6, _arg7);</span><br><span class="line"><span class="hljs-number">26</span>      reply.writeNoException();</span><br><span class="line"><span class="hljs-number">27</span>      reply.writeInt(_result);</span><br><span class="line"><span class="hljs-number">28</span>      <span class="hljs-keyword">return</span> <span class="hljs-keyword">true</span>;</span><br><span class="line"><span class="hljs-number">29</span>    &#125;</span><br></pre></td></tr></table></figure>
+
+<p>而关键代码就是上面的第5行。首先分析readStrongBinder里面做了什么。需要提醒的是，到目前为止Binder代理对象还未创建，只有它在内核空间内的中间形态binder_ref被创建了。</p>
+<p>通过JNI调用，Java层的readStrongBinder方法最终调用了Native层的readStrongBinder函数。</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/java/android/os/Parcel.java#2026" target="_blank" rel="noopener">/frameworks/base/core/java/android/os/Parcel.java</a></p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">2026</span>    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">final</span> IBinder <span class="hljs-title">readStrongBinder</span><span class="hljs-params">()</span> </span>&#123;</span><br><span class="line"><span class="hljs-number">2027</span>        <span class="hljs-keyword">return</span> nativeReadStrongBinder(mNativePtr);</span><br><span class="line"><span class="hljs-number">2028</span>    &#125;</span><br></pre></td></tr></table></figure>
+
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/jni/android_os_Parcel.cpp#451" target="_blank" rel="noopener">/frameworks/base/core/jni/android_os_Parcel.cpp</a></p>
+<figure class="highlight c++ hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">451</span><span class="hljs-function"><span class="hljs-keyword">static</span> jobject <span class="hljs-title">android_os_Parcel_readStrongBinder</span><span class="hljs-params">(JNIEnv* env, jclass clazz, jlong nativePtr)</span></span></span><br><span class="line"><span class="hljs-function">452</span>&#123;</span><br><span class="line"><span class="hljs-number">453</span>    Parcel* parcel = <span class="hljs-keyword">reinterpret_cast</span>&lt;Parcel*&gt;(nativePtr);</span><br><span class="line"><span class="hljs-number">454</span>    <span class="hljs-keyword">if</span> (parcel != <span class="hljs-literal">NULL</span>) &#123;</span><br><span class="line"><span class="hljs-number">455</span>        <span class="hljs-keyword">return</span> javaObjectForIBinder(env, parcel-&gt;readStrongBinder());</span><br><span class="line"><span class="hljs-number">456</span>    &#125;</span><br><span class="line"><span class="hljs-number">457</span>    <span class="hljs-keyword">return</span> <span class="hljs-literal">NULL</span>;</span><br><span class="line"><span class="hljs-number">458</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<p>上面代码的455行可以分为两个部分来讨论，一个是Native层的readStrongBinder函数，另一个是Native层的javaObjectForIBinder函数。下面先讨论第一部分。</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/native/libs/binder/Parcel.cpp#2140" target="_blank" rel="noopener">/frameworks/native/libs/binder/Parcel.cpp</a></p>
+<figure class="highlight c++ hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">2140</span>sp&lt;IBinder&gt; Parcel::readStrongBinder() <span class="hljs-keyword">const</span></span><br><span class="line"><span class="hljs-number">2141</span>&#123;</span><br><span class="line"><span class="hljs-number">2142</span>    sp&lt;IBinder&gt; val;</span><br><span class="line"><span class="hljs-number">2143</span>    <span class="hljs-comment">// Note that a lot of code in Android reads binders by hand with this</span></span><br><span class="line"><span class="hljs-number">2144</span>    <span class="hljs-comment">// method, and that code has historically been ok with getting nullptr</span></span><br><span class="line"><span class="hljs-number">2145</span>    <span class="hljs-comment">// back (while ignoring error codes).</span></span><br><span class="line"><span class="hljs-number">2146</span>    readNullableStrongBinder(&amp;val);</span><br><span class="line"><span class="hljs-number">2147</span>    <span class="hljs-keyword">return</span> val;</span><br><span class="line"><span class="hljs-number">2148</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/native/libs/binder/Parcel.cpp#2135" target="_blank" rel="noopener">/frameworks/native/libs/binder/Parcel.cpp</a></p>
+<figure class="highlight c++ hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-keyword">2135status_t</span> Parcel::readNullableStrongBinder(sp&lt;IBinder&gt;* val) <span class="hljs-keyword">const</span></span><br><span class="line"><span class="hljs-number">2136</span>&#123;</span><br><span class="line"><span class="hljs-number">2137</span>    <span class="hljs-keyword">return</span> unflatten_binder(ProcessState::self(), *<span class="hljs-keyword">this</span>, val);</span><br><span class="line"><span class="hljs-number">2138</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/native/libs/binder/Parcel.cpp#304" target="_blank" rel="noopener">/frameworks/native/libs/binder/Parcel.cpp</a></p>
+<figure class="highlight c++ hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-keyword">304status_t</span> unflatten_binder(<span class="hljs-keyword">const</span> sp&lt;ProcessState&gt;&amp; proc,</span><br><span class="line"><span class="hljs-number">305</span>    <span class="hljs-keyword">const</span> Parcel&amp; in, sp&lt;IBinder&gt;* out)</span><br><span class="line"><span class="hljs-number">306</span>&#123;</span><br><span class="line"><span class="hljs-number">307</span>    <span class="hljs-keyword">const</span> flat_binder_object* flat = in.readObject(<span class="hljs-literal">false</span>);	<span class="hljs-comment">//读出flat_binder_object对象</span></span><br><span class="line"><span class="hljs-number">308</span></span><br><span class="line"><span class="hljs-number">309</span>    <span class="hljs-keyword">if</span> (flat) &#123;</span><br><span class="line"><span class="hljs-number">310</span>        <span class="hljs-keyword">switch</span> (flat-&gt;hdr.type) &#123;</span><br><span class="line"><span class="hljs-number">311</span>            <span class="hljs-keyword">case</span> BINDER_TYPE_BINDER:</span><br><span class="line"><span class="hljs-number">312</span>                *out = <span class="hljs-keyword">reinterpret_cast</span>&lt;IBinder*&gt;(flat-&gt;cookie);</span><br><span class="line"><span class="hljs-number">313</span>                <span class="hljs-keyword">return</span> finish_unflatten_binder(<span class="hljs-literal">NULL</span>, *flat, in);</span><br><span class="line"><span class="hljs-number">314</span>            <span class="hljs-keyword">case</span> BINDER_TYPE_HANDLE:</span><br><span class="line"><span class="hljs-number">315</span>                *out = proc-&gt;getStrongProxyForHandle(flat-&gt;handle);</span><br><span class="line"><span class="hljs-number">316</span>                <span class="hljs-keyword">return</span> finish_unflatten_binder(</span><br><span class="line"><span class="hljs-number">317</span>                    <span class="hljs-keyword">static_cast</span>&lt;BpBinder*&gt;(out-&gt;get()), *flat, in);</span><br><span class="line"><span class="hljs-number">318</span>        &#125;</span><br><span class="line"><span class="hljs-number">319</span>    &#125;</span><br><span class="line"><span class="hljs-number">320</span>    <span class="hljs-keyword">return</span> BAD_TYPE;</span><br><span class="line"><span class="hljs-number">321</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<p>readStrongBinder函数最终调用到unflatten_binder函数，315行表明根据flat_binder_object对象得到一个native层的BpBinder对象。</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/native/libs/binder/ProcessState.cpp#244" target="_blank" rel="noopener">frameworks/native/libs/binder/ProcessState.cpp</a></p>
+<figure class="highlight c++ hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">244</span>sp&lt;IBinder&gt; ProcessState::getStrongProxyForHandle(<span class="hljs-keyword">int32_t</span> handle)</span><br><span class="line"><span class="hljs-number">245</span>&#123;</span><br><span class="line"><span class="hljs-number">246</span>    sp&lt;IBinder&gt; result;</span><br><span class="line"><span class="hljs-number">247</span></span><br><span class="line"><span class="hljs-number">248</span>    AutoMutex _l(mLock);</span><br><span class="line"><span class="hljs-number">249</span></span><br><span class="line"><span class="hljs-number">250</span>    handle_entry* e = lookupHandleLocked(handle);</span><br><span class="line"><span class="hljs-number">251</span></span><br><span class="line"><span class="hljs-number">252</span>    <span class="hljs-keyword">if</span> (e != <span class="hljs-literal">NULL</span>) &#123;</span><br><span class="line"><span class="hljs-number">253</span>        <span class="hljs-comment">// We need to create a new BpBinder if there isn't currently one, OR we</span></span><br><span class="line"><span class="hljs-number">254</span>        <span class="hljs-comment">// are unable to acquire a weak reference on this current one.  See comment</span></span><br><span class="line"><span class="hljs-number">255</span>        <span class="hljs-comment">// in getWeakProxyForHandle() for more info about this.</span></span><br><span class="line"><span class="hljs-number">256</span>        IBinder* b = e-&gt;binder;</span><br><span class="line"><span class="hljs-number">257</span>        <span class="hljs-keyword">if</span> (b == <span class="hljs-literal">NULL</span> || !e-&gt;refs-&gt;attemptIncWeak(<span class="hljs-keyword">this</span>)) &#123;</span><br><span class="line"><span class="hljs-number">258</span>            <span class="hljs-keyword">if</span> (handle == <span class="hljs-number">0</span>) &#123;</span><br><span class="line"><span class="hljs-number">259</span>                <span class="hljs-comment">// Special case for context manager...</span></span><br><span class="line"><span class="hljs-number">260</span>                <span class="hljs-comment">// The context manager is the only object for which we create</span></span><br><span class="line"><span class="hljs-number">261</span>                <span class="hljs-comment">// a BpBinder proxy without already holding a reference.</span></span><br><span class="line"><span class="hljs-number">262</span>                <span class="hljs-comment">// Perform a dummy transaction to ensure the context manager</span></span><br><span class="line"><span class="hljs-number">263</span>                <span class="hljs-comment">// is registered before we create the first local reference</span></span><br><span class="line"><span class="hljs-number">264</span>                <span class="hljs-comment">// to it (which will occur when creating the BpBinder).</span></span><br><span class="line"><span class="hljs-number">265</span>                <span class="hljs-comment">// If a local reference is created for the BpBinder when the</span></span><br><span class="line"><span class="hljs-number">266</span>                <span class="hljs-comment">// context manager is not present, the driver will fail to</span></span><br><span class="line"><span class="hljs-number">267</span>                <span class="hljs-comment">// provide a reference to the context manager, but the</span></span><br><span class="line"><span class="hljs-number">268</span>                <span class="hljs-comment">// driver API does not return status.</span></span><br><span class="line"><span class="hljs-number">269</span>                <span class="hljs-comment">//</span></span><br><span class="line"><span class="hljs-number">270</span>                <span class="hljs-comment">// Note that this is not race-free if the context manager</span></span><br><span class="line"><span class="hljs-number">271</span>                <span class="hljs-comment">// dies while this code runs.</span></span><br><span class="line"><span class="hljs-number">272</span>                <span class="hljs-comment">//</span></span><br><span class="line"><span class="hljs-number">273</span>                <span class="hljs-comment">// <span class="hljs-doctag">TODO:</span> add a driver API to wait for context manager, or</span></span><br><span class="line"><span class="hljs-number">274</span>                <span class="hljs-comment">// stop special casing handle 0 for context manager and add</span></span><br><span class="line"><span class="hljs-number">275</span>                <span class="hljs-comment">// a driver API to get a handle to the context manager with</span></span><br><span class="line"><span class="hljs-number">276</span>                <span class="hljs-comment">// proper reference counting.</span></span><br><span class="line"><span class="hljs-number">277</span></span><br><span class="line"><span class="hljs-number">278</span>                Parcel data;</span><br><span class="line"><span class="hljs-number">279</span>                <span class="hljs-keyword">status_t</span> status = IPCThreadState::self()-&gt;transact(</span><br><span class="line"><span class="hljs-number">280</span>                        <span class="hljs-number">0</span>, IBinder::PING_TRANSACTION, data, <span class="hljs-literal">NULL</span>, <span class="hljs-number">0</span>);</span><br><span class="line"><span class="hljs-number">281</span>                <span class="hljs-keyword">if</span> (status == DEAD_OBJECT)</span><br><span class="line"><span class="hljs-number">282</span>                   <span class="hljs-keyword">return</span> <span class="hljs-literal">NULL</span>;</span><br><span class="line"><span class="hljs-number">283</span>            &#125;</span><br><span class="line"><span class="hljs-number">284</span></span><br><span class="line"><span class="hljs-number">285</span>            b = BpBinder::create(handle);</span><br><span class="line"><span class="hljs-number">286</span>            e-&gt;binder = b;</span><br><span class="line"><span class="hljs-number">287</span>            <span class="hljs-keyword">if</span> (b) e-&gt;refs = b-&gt;getWeakRefs();</span><br><span class="line"><span class="hljs-number">288</span>            result = b;</span><br><span class="line"><span class="hljs-number">289</span>        &#125; <span class="hljs-keyword">else</span> &#123;</span><br><span class="line"><span class="hljs-number">290</span>            <span class="hljs-comment">// This little bit of nastyness is to allow us to add a primary</span></span><br><span class="line"><span class="hljs-number">291</span>            <span class="hljs-comment">// reference to the remote proxy when this team doesn't have one</span></span><br><span class="line"><span class="hljs-number">292</span>            <span class="hljs-comment">// but another team is sending the handle to us.</span></span><br><span class="line"><span class="hljs-number">293</span>            result.force_set(b);</span><br><span class="line"><span class="hljs-number">294</span>            e-&gt;refs-&gt;decWeak(<span class="hljs-keyword">this</span>);</span><br><span class="line"><span class="hljs-number">295</span>        &#125;</span><br><span class="line"><span class="hljs-number">296</span>    &#125;</span><br><span class="line"><span class="hljs-number">297</span></span><br><span class="line"><span class="hljs-number">298</span>    <span class="hljs-keyword">return</span> result;</span><br><span class="line"><span class="hljs-number">299</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<p>250行是根据handle值到一个Vector中寻找对应的handle_entry对象。而此时，由于Binder代理对象并不存在，所以Vector中也找不到相应信息。</p>
+<figure class="highlight c++ hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">231</span>ProcessState::handle_entry* ProcessState::lookupHandleLocked(<span class="hljs-keyword">int32_t</span> handle)</span><br><span class="line"><span class="hljs-number">232</span>&#123;</span><br><span class="line"><span class="hljs-number">233</span>    <span class="hljs-keyword">const</span> <span class="hljs-keyword">size_t</span> N=mHandleToObject.size();</span><br><span class="line"><span class="hljs-number">234</span>    <span class="hljs-keyword">if</span> (N &lt;= (<span class="hljs-keyword">size_t</span>)handle) &#123;</span><br><span class="line"><span class="hljs-number">235</span>        handle_entry e;</span><br><span class="line"><span class="hljs-number">236</span>        e.binder = <span class="hljs-literal">NULL</span>;</span><br><span class="line"><span class="hljs-number">237</span>        e.refs = <span class="hljs-literal">NULL</span>;</span><br><span class="line"><span class="hljs-number">238</span>        <span class="hljs-keyword">status_t</span> err = mHandleToObject.insertAt(e, N, handle+<span class="hljs-number">1</span>-N);</span><br><span class="line"><span class="hljs-number">239</span>        <span class="hljs-keyword">if</span> (err &lt; NO_ERROR) <span class="hljs-keyword">return</span> <span class="hljs-literal">NULL</span>;</span><br><span class="line"><span class="hljs-number">240</span>    &#125;</span><br><span class="line"><span class="hljs-number">241</span>    <span class="hljs-keyword">return</span> &amp;mHandleToObject.editItemAt(handle);</span><br><span class="line"><span class="hljs-number">242</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<p>当Vector中找不到相应信息的时候，便会创建一些新的handle_entry加入其中。但这些新加入的handle_entry内部内容是空的，所以最终会调用上面285行代码，通过BpBinder::create方法创建Binder代理对象在native层的中间形态。</p>
+<p>BpBinder::create方法最终新建了一个BpBinder对象，该对象就是Binder代理对象在Native层的中间形态。</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/native/libs/binder/BpBinder.cpp#109" target="_blank" rel="noopener">/frameworks/native/libs/binder/BpBinder.cpp</a></p>
+<figure class="highlight c++ hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">109B</span>pBinder* BpBinder::create(<span class="hljs-keyword">int32_t</span> handle) &#123;</span><br><span class="line"><span class="hljs-number">110</span>    <span class="hljs-keyword">int32_t</span> trackedUid = <span class="hljs-number">-1</span>;</span><br><span class="line"><span class="hljs-number">111</span>    <span class="hljs-keyword">if</span> (sCountByUidEnabled) &#123;</span><br><span class="line"><span class="hljs-number">112</span>        trackedUid = IPCThreadState::self()-&gt;getCallingUid();</span><br><span class="line"><span class="hljs-number">113</span>        AutoMutex _l(sTrackingLock);</span><br><span class="line"><span class="hljs-number">114</span>        <span class="hljs-keyword">uint32_t</span> trackedValue = sTrackingMap[trackedUid];</span><br><span class="line"><span class="hljs-number">115</span>        <span class="hljs-keyword">if</span> (CC_UNLIKELY(trackedValue &amp; LIMIT_REACHED_MASK)) &#123;</span><br><span class="line"><span class="hljs-number">116</span>            <span class="hljs-keyword">if</span> (sBinderProxyThrottleCreate) &#123;</span><br><span class="line"><span class="hljs-number">117</span>                <span class="hljs-keyword">return</span> <span class="hljs-literal">nullptr</span>;</span><br><span class="line"><span class="hljs-number">118</span>            &#125;</span><br><span class="line"><span class="hljs-number">119</span>        &#125; <span class="hljs-keyword">else</span> &#123;</span><br><span class="line"><span class="hljs-number">120</span>            <span class="hljs-keyword">if</span> ((trackedValue &amp; COUNTING_VALUE_MASK) &gt;= sBinderProxyCountHighWatermark) &#123;</span><br><span class="line"><span class="hljs-number">121</span>                ALOGE(<span class="hljs-string">"Too many binder proxy objects sent to uid %d from uid %d (%d proxies held)"</span>,</span><br><span class="line"><span class="hljs-number">122</span>                      getuid(), trackedUid, trackedValue);</span><br><span class="line"><span class="hljs-number">123</span>                sTrackingMap[trackedUid] |= LIMIT_REACHED_MASK;</span><br><span class="line"><span class="hljs-number">124</span>                <span class="hljs-keyword">if</span> (sLimitCallback) sLimitCallback(trackedUid);</span><br><span class="line"><span class="hljs-number">125</span>                <span class="hljs-keyword">if</span> (sBinderProxyThrottleCreate) &#123;</span><br><span class="line"><span class="hljs-number">126</span>                    ALOGI(<span class="hljs-string">"Throttling binder proxy creates from uid %d in uid %d until binder proxy"</span></span><br><span class="line"><span class="hljs-number">127</span>                          <span class="hljs-string">" count drops below %d"</span>,</span><br><span class="line"><span class="hljs-number">128</span>                          trackedUid, getuid(), sBinderProxyCountLowWatermark);</span><br><span class="line"><span class="hljs-number">129</span>                    <span class="hljs-keyword">return</span> <span class="hljs-literal">nullptr</span>;</span><br><span class="line"><span class="hljs-number">130</span>                &#125;</span><br><span class="line"><span class="hljs-number">131</span>            &#125;</span><br><span class="line"><span class="hljs-number">132</span>        &#125;</span><br><span class="line"><span class="hljs-number">133</span>        sTrackingMap[trackedUid]++;</span><br><span class="line"><span class="hljs-number">134</span>    &#125;</span><br><span class="line"><span class="hljs-number">135</span>    <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> BpBinder(handle, trackedUid);</span><br><span class="line"><span class="hljs-number">136</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-3-Binder代理对象在Java层的中间形态"><a href="#2-3-Binder代理对象在Java层的中间形态" class="headerlink" title="2.3 Binder代理对象在Java层的中间形态"></a>2.3 Binder代理对象在Java层的中间形态</h3><p>得到Native层的BpBinder对象后，会不断向上返回，一直回到JNI层android_os_Parcel_readStrongBinder函数的455行。readStrongBinder返回的是BpBinder对象，而javaObjectForIBinder函数则会根据这个native对象创建出Binder代理对象在Java层的中间形态，这个中间形态就是Java层的BinderProxy对象。</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/jni/android_os_Parcel.cpp#451" target="_blank" rel="noopener">/frameworks/base/core/jni/android_os_Parcel.cpp</a></p>
+<figure class="highlight c++ hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">451</span><span class="hljs-function"><span class="hljs-keyword">static</span> jobject <span class="hljs-title">android_os_Parcel_readStrongBinder</span><span class="hljs-params">(JNIEnv* env, jclass clazz, jlong nativePtr)</span></span></span><br><span class="line"><span class="hljs-function">452</span>&#123;</span><br><span class="line"><span class="hljs-number">453</span>    Parcel* parcel = <span class="hljs-keyword">reinterpret_cast</span>&lt;Parcel*&gt;(nativePtr);</span><br><span class="line"><span class="hljs-number">454</span>    <span class="hljs-keyword">if</span> (parcel != <span class="hljs-literal">NULL</span>) &#123;</span><br><span class="line"><span class="hljs-number">455</span>        <span class="hljs-keyword">return</span> javaObjectForIBinder(env, parcel-&gt;readStrongBinder());</span><br><span class="line"><span class="hljs-number">456</span>    &#125;</span><br><span class="line"><span class="hljs-number">457</span>    <span class="hljs-keyword">return</span> <span class="hljs-literal">NULL</span>;</span><br><span class="line"><span class="hljs-number">458</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<p>首先661行会创建一个Native层的BinderProxyNativeData对象。接着在664行回到Java层，根据BinderProxyNativeData对象的指针创建BinderProxy对象。</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/jni/android_util_Binder.cpp#644" target="_blank" rel="noopener">/frameworks/base/core/jni/android_util_Binder.cpp</a></p>
+<figure class="highlight c++ hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">644</span><span class="hljs-function">jobject <span class="hljs-title">javaObjectForIBinder</span><span class="hljs-params">(JNIEnv* env, <span class="hljs-keyword">const</span> sp&lt;IBinder&gt;&amp; val)</span></span></span><br><span class="line"><span class="hljs-function">645</span>&#123;</span><br><span class="line"><span class="hljs-number">646</span>    <span class="hljs-keyword">if</span> (val == <span class="hljs-literal">NULL</span>) <span class="hljs-keyword">return</span> <span class="hljs-literal">NULL</span>;</span><br><span class="line"><span class="hljs-number">647</span></span><br><span class="line"><span class="hljs-number">648</span>    <span class="hljs-keyword">if</span> (val-&gt;checkSubclass(&amp;gBinderOffsets)) &#123;</span><br><span class="line"><span class="hljs-number">649</span>        <span class="hljs-comment">// It's a JavaBBinder created by ibinderForJavaObject. Already has Java object.</span></span><br><span class="line"><span class="hljs-number">650</span>        jobject object = <span class="hljs-keyword">static_cast</span>&lt;JavaBBinder*&gt;(val.get())-&gt;object();</span><br><span class="line"><span class="hljs-number">651</span>        LOGDEATH(<span class="hljs-string">"objectForBinder %p: it's our own %p!\n"</span>, val.get(), object);</span><br><span class="line"><span class="hljs-number">652</span>        <span class="hljs-keyword">return</span> object;</span><br><span class="line"><span class="hljs-number">653</span>    &#125;</span><br><span class="line"><span class="hljs-number">654</span></span><br><span class="line"><span class="hljs-number">655</span>    <span class="hljs-comment">// For the rest of the function we will hold this lock, to serialize</span></span><br><span class="line"><span class="hljs-number">656</span>    <span class="hljs-comment">// looking/creation/destruction of Java proxies for native Binder proxies.</span></span><br><span class="line"><span class="hljs-number">657</span>    AutoMutex _l(gProxyLock);</span><br><span class="line"><span class="hljs-number">658</span></span><br><span class="line"><span class="hljs-number">659</span>    BinderProxyNativeData* nativeData = gNativeDataCache;</span><br><span class="line"><span class="hljs-number">660</span>    <span class="hljs-keyword">if</span> (nativeData == <span class="hljs-literal">nullptr</span>) &#123;</span><br><span class="line"><span class="hljs-number">661</span>        nativeData = <span class="hljs-keyword">new</span> BinderProxyNativeData();</span><br><span class="line"><span class="hljs-number">662</span>    &#125;</span><br><span class="line"><span class="hljs-number">663</span>    <span class="hljs-comment">// gNativeDataCache is now logically empty.</span></span><br><span class="line"><span class="hljs-number">664</span>    jobject object = env-&gt;CallStaticObjectMethod(gBinderProxyOffsets.mClass,</span><br><span class="line"><span class="hljs-number">665</span>            gBinderProxyOffsets.mGetInstance, (jlong) nativeData, (jlong) val.get());</span><br><span class="line"><span class="hljs-number">666</span>    <span class="hljs-keyword">if</span> (env-&gt;ExceptionCheck()) &#123;</span><br><span class="line"><span class="hljs-number">667</span>        <span class="hljs-comment">// In the exception case, getInstance still took ownership of nativeData.</span></span><br><span class="line"><span class="hljs-number">668</span>        gNativeDataCache = <span class="hljs-literal">nullptr</span>;</span><br><span class="line"><span class="hljs-number">669</span>        <span class="hljs-keyword">return</span> <span class="hljs-literal">NULL</span>;</span><br><span class="line"><span class="hljs-number">670</span>    &#125;</span><br><span class="line"><span class="hljs-number">671</span>    BinderProxyNativeData* actualNativeData = getBPNativeData(env, object);</span><br><span class="line"><span class="hljs-number">672</span>    <span class="hljs-keyword">if</span> (actualNativeData == nativeData) &#123;</span><br><span class="line"><span class="hljs-number">673</span>        <span class="hljs-comment">// New BinderProxy; we still have exclusive access.</span></span><br><span class="line"><span class="hljs-number">674</span>        nativeData-&gt;mOrgue = <span class="hljs-keyword">new</span> DeathRecipientList;</span><br><span class="line"><span class="hljs-number">675</span>        nativeData-&gt;mObject = val;</span><br><span class="line"><span class="hljs-number">676</span>        gNativeDataCache = <span class="hljs-literal">nullptr</span>;</span><br><span class="line"><span class="hljs-number">677</span>        ++gNumProxies;</span><br><span class="line"><span class="hljs-number">678</span>        <span class="hljs-keyword">if</span> (gNumProxies &gt;= gProxiesWarned + PROXY_WARN_INTERVAL) &#123;</span><br><span class="line"><span class="hljs-number">679</span>            ALOGW(<span class="hljs-string">"Unexpectedly many live BinderProxies: %d\n"</span>, gNumProxies);</span><br><span class="line"><span class="hljs-number">680</span>            gProxiesWarned = gNumProxies;</span><br><span class="line"><span class="hljs-number">681</span>        &#125;</span><br><span class="line"><span class="hljs-number">682</span>    &#125; <span class="hljs-keyword">else</span> &#123;</span><br><span class="line"><span class="hljs-number">683</span>        <span class="hljs-comment">// nativeData wasn't used. Reuse it the next time.</span></span><br><span class="line"><span class="hljs-number">684</span>        gNativeDataCache = nativeData;</span><br><span class="line"><span class="hljs-number">685</span>    &#125;</span><br><span class="line"><span class="hljs-number">686</span></span><br><span class="line"><span class="hljs-number">687</span>    <span class="hljs-keyword">return</span> object;</span><br><span class="line"><span class="hljs-number">688</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/jni/android_util_Binder.cpp#619" target="_blank" rel="noopener">/frameworks/base/core/jni/android_util_Binder.cpp</a></p>
+<figure class="highlight c++ hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">619</span>struct BinderProxyNativeData &#123;</span><br><span class="line"><span class="hljs-number">620</span>    <span class="hljs-comment">// Both fields are constant and not null once javaObjectForIBinder returns this as</span></span><br><span class="line"><span class="hljs-number">621</span>    <span class="hljs-comment">// part of a BinderProxy.</span></span><br><span class="line"><span class="hljs-number">622</span></span><br><span class="line"><span class="hljs-number">623</span>    <span class="hljs-comment">// The native IBinder proxied by this BinderProxy.</span></span><br><span class="line"><span class="hljs-number">624</span>    sp&lt;IBinder&gt; mObject;</span><br><span class="line"><span class="hljs-number">625</span></span><br><span class="line"><span class="hljs-number">626</span>    <span class="hljs-comment">// Death recipients for mObject. Reference counted only because DeathRecipients</span></span><br><span class="line"><span class="hljs-number">627</span>    <span class="hljs-comment">// hold a weak reference that can be temporarily promoted.</span></span><br><span class="line"><span class="hljs-number">628</span>    sp&lt;DeathRecipientList&gt; mOrgue;  <span class="hljs-comment">// Death recipients for mObject.</span></span><br><span class="line"><span class="hljs-number">629</span>&#125;;</span><br></pre></td></tr></table></figure>
+
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/java/android/os/Binder.java#1060" target="_blank" rel="noopener">/frameworks/base/core/java/android/os/Binder.java</a></p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">1060</span>    <span class="hljs-function"><span class="hljs-keyword">private</span> <span class="hljs-keyword">static</span> BinderProxy <span class="hljs-title">getInstance</span><span class="hljs-params">(<span class="hljs-keyword">long</span> nativeData, <span class="hljs-keyword">long</span> iBinder)</span> </span>&#123;</span><br><span class="line"><span class="hljs-number">1061</span>        BinderProxy result;</span><br><span class="line"><span class="hljs-number">1062</span>        <span class="hljs-keyword">try</span> &#123;</span><br><span class="line"><span class="hljs-number">1063</span>            result = sProxyMap.get(iBinder);</span><br><span class="line"><span class="hljs-number">1064</span>            <span class="hljs-keyword">if</span> (result != <span class="hljs-keyword">null</span>) &#123;</span><br><span class="line"><span class="hljs-number">1065</span>                <span class="hljs-keyword">return</span> result;</span><br><span class="line"><span class="hljs-number">1066</span>            &#125;</span><br><span class="line"><span class="hljs-number">1067</span>            result = <span class="hljs-keyword">new</span> BinderProxy(nativeData);</span><br><span class="line"><span class="hljs-number">1068</span>        &#125; <span class="hljs-keyword">catch</span> (Throwable e) &#123;</span><br><span class="line"><span class="hljs-number">1069</span>            <span class="hljs-comment">// We're throwing an exception (probably OOME); don't drop nativeData.</span></span><br><span class="line"><span class="hljs-number">1070</span>            NativeAllocationRegistry.applyFreeFunction(NoImagePreloadHolder.sNativeFinalizer,</span><br><span class="line"><span class="hljs-number">1071</span>                    nativeData);</span><br><span class="line"><span class="hljs-number">1072</span>            <span class="hljs-keyword">throw</span> e;</span><br><span class="line"><span class="hljs-number">1073</span>        &#125;</span><br><span class="line"><span class="hljs-number">1074</span>        NoImagePreloadHolder.sRegistry.registerNativeAllocation(result, nativeData);</span><br><span class="line"><span class="hljs-number">1075</span>        <span class="hljs-comment">// The registry now owns nativeData, even if registration threw an exception.</span></span><br><span class="line"><span class="hljs-number">1076</span>        sProxyMap.set(iBinder, result);</span><br><span class="line"><span class="hljs-number">1077</span>        <span class="hljs-keyword">return</span> result;</span><br><span class="line"><span class="hljs-number">1078</span>    &#125;</span><br></pre></td></tr></table></figure>
+
+<p>至此，Binder代理对象所有的中间形态都已经创建完毕。它们是内核空间的binder_ref对象，Native空间的BpBinder对象、BinderProxyNativeData对象，以及Java层的BinderProxy对象。它们之间的关系如下图所示。</p>
+<p><img src="https://raw.githubusercontent.com/banshann/Picbed/master/Binder%E4%BB%A3%E7%90%86%E5%AF%B9%E8%B1%A1%E4%B8%AD%E9%97%B4%E5%BD%A2%E6%80%81%E4%B9%8B%E9%97%B4%E7%9A%84%E5%85%B3%E7%B3%BB.jpg" alt="Binder代理对象中间形态之间的关系"></p>
+<h3 id="2-4-Binder代理对象的出现"><a href="#2-4-Binder代理对象的出现" class="headerlink" title="2.4 Binder代理对象的出现"></a>2.4 Binder代理对象的出现</h3><p>接下来就是Binder代理对象真正出场的时候。</p>
+<p>回到AIDL文件生成的Java方法中，此时第5行的data.readStrongBinder返回BinderProxy对象。通过调用asInterface方法，我们将得到真正的Binder代理对象。</p>
+<p>*<u>IActivityManager.java (编译过程中，根据AIDL文件生成)</u>*</p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">1</span>     <span class="hljs-keyword">case</span> TRANSACTION_bindService:</span><br><span class="line"><span class="hljs-number">2</span>     &#123;</span><br><span class="line"><span class="hljs-number">3</span>       data.enforceInterface(descriptor);</span><br><span class="line"><span class="hljs-number">4</span>       android.app.IApplicationThread _arg0;</span><br><span class="line"><span class="hljs-number">5</span>       _arg0 = android.app.IApplicationThread.Stub.asInterface(data.readStrongBinder());</span><br></pre></td></tr></table></figure>
+
+<p>*<u>IActivityManager.java (编译过程中，根据AIDL文件生成)</u>*</p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">1</span>     <span class="hljs-keyword">public</span> <span class="hljs-keyword">static</span> android.app.<span class="hljs-function">IApplicationThread <span class="hljs-title">asInterface</span><span class="hljs-params">(android.os.IBinder obj)</span></span></span><br><span class="line"><span class="hljs-function">2     </span>&#123;</span><br><span class="line"><span class="hljs-number">3</span>       <span class="hljs-keyword">if</span> ((obj==<span class="hljs-keyword">null</span>)) &#123;</span><br><span class="line"><span class="hljs-number">4</span>         <span class="hljs-keyword">return</span> <span class="hljs-keyword">null</span>;</span><br><span class="line"><span class="hljs-number">5</span>       &#125;</span><br><span class="line"><span class="hljs-number">6</span>       android.os.IInterface iin = obj.queryLocalInterface(DESCRIPTOR);</span><br><span class="line"><span class="hljs-number">7</span>       <span class="hljs-keyword">if</span> (((iin!=<span class="hljs-keyword">null</span>)&amp;&amp;(iin <span class="hljs-keyword">instanceof</span> android.app.IApplicationThread))) &#123;</span><br><span class="line"><span class="hljs-number">8</span>         <span class="hljs-keyword">return</span> ((android.app.IApplicationThread)iin);</span><br><span class="line"><span class="hljs-number">9</span>       &#125;</span><br><span class="line"><span class="hljs-number">10</span>      <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> android.app.IApplicationThread.Stub.Proxy(obj);</span><br><span class="line"><span class="hljs-number">11</span>    &#125;</span><br></pre></td></tr></table></figure>
+
+<p>对于BinderProxy对象而言，它的queryLocalInterface方法返回为null，所以第7行的判断将会失败。因此asInterface最后会返回一个新的IApplicationThread.Stub.Proxy对象。这个新创建的对象继承了IApplicationThread接口，它就是最终的Binder代理对象，并通过mRemote持有BinderProxy对象的引用。</p>
+<p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/java/android/os/Binder.java#1103" target="_blank" rel="noopener">/frameworks/base/core/java/android/os/Binder.java</a></p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">1103</span>    <span class="hljs-function"><span class="hljs-keyword">public</span> IInterface <span class="hljs-title">queryLocalInterface</span><span class="hljs-params">(String descriptor)</span> </span>&#123;</span><br><span class="line"><span class="hljs-number">1104</span>        <span class="hljs-keyword">return</span> <span class="hljs-keyword">null</span>;</span><br><span class="line"><span class="hljs-number">1105</span>    &#125;</span><br></pre></td></tr></table></figure>
+
+<p>*<u>IActivityManager.java (编译过程中，根据AIDL文件生成)</u>*</p>
+<figure class="highlight java hljs"><table><tr><td class="code"><pre><span class="line"><span class="hljs-number">1</span>    <span class="hljs-keyword">private</span> <span class="hljs-keyword">static</span> <span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Proxy</span> <span class="hljs-keyword">implements</span> <span class="hljs-title">android</span>.<span class="hljs-title">app</span>.<span class="hljs-title">IApplicationThread</span></span></span><br><span class="line"><span class="hljs-class">2    </span>&#123;</span><br><span class="line"><span class="hljs-number">3</span>      <span class="hljs-keyword">private</span> android.os.IBinder mRemote;</span><br><span class="line"><span class="hljs-number">4</span>      Proxy(android.os.IBinder remote)</span><br><span class="line"><span class="hljs-number">5</span>      &#123;</span><br><span class="line"><span class="hljs-number">6</span>        mRemote = remote;</span><br><span class="line"><span class="hljs-number">7</span>      &#125;</span><br></pre></td></tr></table></figure>
+
+<p>如此一来，Binder代理对象及其中间形态的关系便如下所示。</p>
+<p><img src="https://raw.githubusercontent.com/banshann/Picbed/master/Binder%E4%BB%A3%E7%90%86%E5%AF%B9%E8%B1%A1%E5%92%8C%E6%89%80%E6%9C%89%E4%B8%AD%E9%97%B4%E5%BD%A2%E6%80%81%E7%9A%84%E5%85%B3%E7%B3%BB.jpg" alt="Binder代理对象和所有中间形态的关系"></p>
+<h2 id="3-总结"><a href="#3-总结" class="headerlink" title="3 总结"></a>3 总结</h2><p>获取Binder代理对象有两种方式，除了通过ServiceManager获取外，还可以通过已有的 Binder通信管道将本端的实体对象发送到对端。二者看似不同，但其实第一种方式只是第二种方式的封装，它们本质都是通过已有的Binder通信通道将flat_binder_object发送到对端。</p>
+<p>为了能够让对端进程获取到本进程Binder实体对象的代理对象，首先需要在本进程中创建它。创建完之后，便可以通过已有的Binder通信通道将它发送到对端进程。下图展示了这中间所有对象的创建时序和关系。</p>
+<p><img src="https://raw.githubusercontent.com/banshann/Picbed/master/Binder%E6%89%80%E6%9C%89%E5%AF%B9%E8%B1%A1%E5%88%9B%E5%BB%BA%E6%97%B6%E5%BA%8F.jpg" alt="Binder所有对象创建时序"></p>
+<p>这是Binder代理机制的上篇，主要讲述了Binder代理对象的创建过程以及各个中间形态的创建时序和关系。下篇将会详细阐述如何通过Binder代理对象调用Binder实体对象的方法，敬请期待。</p>
+
+        </div>
+        
+        <div class="level is-size-7 is-uppercase">
+            <div class="level-start">
+                <div class="level-item">
+                    <span class="is-size-6 has-text-grey has-mr-7">#</span>
+                    <a class="has-link-grey -link" href="/tags/Binder/">Binder</a>, <a class="has-link-grey -link" href="/tags/Proxy/">Proxy</a>
+                </div>
+            </div>
+        </div>
+        
+        
+        
+    </div>
+</div>
+
+
+
+
+
+<div class="card card-transparent">
+    <div class="level post-navigation is-flex-wrap is-mobile">
+        
+        
+        <div class="level-end">
+            <a class="level level-item has-link-grey  article-nav-next" href="/Binder概述/">
+                <span class="level-item">Binder概述</span>
+                <i class="level-item fas fa-chevron-right"></i>
+            </a>
+        </div>
+        
+    </div>
+</div>
+
+
+
+<div class="card">
+    <div class="card-content">
+        <h3 class="title is-5 has-text-weight-normal">评论</h3>
+        
+<div id="valine-thread" class="content"></div>
+<script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+<script src="//unpkg.com/valine/dist/Valine.min.js"></script>
+<script>
+    new Valine({
+        el: '#valine-thread' ,
+        notify: false,
+        verify: true,
+        app_id: 'iXHBSBSU1KTNC22OGBvTkw52-MdYXbMMI',
+        app_key: 'c2FBJHKWUYse4kFTDlL5vRLg',
+        placeholder: '评论时最好先留下昵称~'
+    });
+</script>
+
+    </div>
+</div>
+</div>
+                
+                    
+
+
+
+
+<div class="column is-4-tablet is-4-desktop is-4-widescreen  has-order-3 column-right is-sticky">
+    
+        
+<div class="card widget" id="toc">
+    <div class="card-content">
+        <div class="menu">
+            <h3 class="menu-label">
+                目录
+            </h3>
+            <ul class="menu-list"><li>
+        <a class="is-flex" href="#1-Binder实体对象的出现和意义">
+        <span>1. Binder实体对象的出现和意义</span>
+        </a><ul class="menu-list"><li>
+        <a class="is-flex" href="#1-1-Binder实体对象是什么？">
+        <span>1.1 Binder实体对象是什么？</span>
+        </a></li><li>
+        <a class="is-flex" href="#1-2-Binder实体对象的创建过程">
+        <span>1.2 Binder实体对象的创建过程</span>
+        </a></li><li>
+        <a class="is-flex" href="#1-3-Binder实体对象如何让驱动感知到它的存在？">
+        <span>1.3 Binder实体对象如何让驱动感知到它的存在？</span>
+        </a></li></ul></li><li>
+        <a class="is-flex" href="#2-Binder代理对象的创建过程">
+        <span>2. Binder代理对象的创建过程</span>
+        </a><ul class="menu-list"><li>
+        <a class="is-flex" href="#2-1-Binder代理对象在内核空间的中间形态">
+        <span>2.1 Binder代理对象在内核空间的中间形态</span>
+        </a></li><li>
+        <a class="is-flex" href="#2-2-Binder代理对象在Native层的中间形态">
+        <span>2.2 Binder代理对象在Native层的中间形态</span>
+        </a></li><li>
+        <a class="is-flex" href="#2-3-Binder代理对象在Java层的中间形态">
+        <span>2.3 Binder代理对象在Java层的中间形态</span>
+        </a></li><li>
+        <a class="is-flex" href="#2-4-Binder代理对象的出现">
+        <span>2.4 Binder代理对象的出现</span>
+        </a></li></ul></li><li>
+        <a class="is-flex" href="#3-总结">
+        <span>3 总结</span>
+        </a></li></ul>
+        </div>
+    </div>
+</div>
+
+    
+    
+</div>
+
+                
+            </div>
+        </div>
+    </section>
+    <footer class="footer">
+    <div class="container">
+        <div class="level">
+            <div class="level-start has-text-centered-mobile">
+                <a class="footer-logo is-block has-mb-6" href="/">
+                
+                    <img src="/images/banshan.png" alt="Binder代理机制" height="28">
+                
+                </a>
+                <p class="is-size-7">
+                &copy; 2019 芦半山&nbsp;
+                Powered by <a href="https://hexo.io/" target="_blank">Hexo</a> & <a href="https://github.com/ppoffice/hexo-theme-icarus" target="_blank">Icarus</a>
+                
+                <br>
+                <span id="busuanzi_container_site_uv">
+                共<span id="busuanzi_value_site_uv">0</span>个访客
+                </span>
+                
+                </p>
+            </div>
+            <div class="level-end">
+            
+                <div class="field has-addons is-flex-center-mobile has-mt-5-mobile is-flex-wrap is-flex-middle">
+                
+                
+                <p class="control">
+                    <a class="button is-white is-large" target="_blank" title="Creative Commons" href="https://creativecommons.org/">
+                        
+                        <i class="fab fa-creative-commons"></i>
+                        
+                    </a>
+                </p>
+                
+                <p class="control">
+                    <a class="button is-white is-large" target="_blank" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/">
+                        
+                        <i class="fab fa-creative-commons-by"></i>
+                        
+                    </a>
+                </p>
+                
+                </div>
+            
+            </div>
+        </div>
+    </div>
+</footer>
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script>
+<script>moment.locale("zh-CN");</script>
+
+<script>
+var IcarusThemeSettings = {
+    article: {
+        highlight: {
+            clipboard: true,
+            fold: 'unfolded'
+        }
+    }
+};
+</script>
+
+
+    <script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script>
+
+
+
+    
+    
+    
+    <script src="/js/animation.js"></script>
+    
+
+    
+    
+    
+    <script src="https://cdn.jsdelivr.net/npm/lightgallery@1.6.8/dist/js/lightgallery.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.7.0/dist/js/jquery.justifiedGallery.min.js" defer></script>
+    <script src="/js/gallery.js" defer></script>
+    
+
+    
+    
+
+<div id="outdated">
+    <h6>Your browser is out-of-date!</h6>
+    <p>Update your browser to view this website correctly. <a id="btnUpdateBrowser" href="http://outdatedbrowser.com/">Update
+            my browser now </a></p>
+    <p class="last"><a href="#" id="btnCloseUpdateBrowser" title="Close">&times;</a></p>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/outdatedbrowser@1.1.5/outdatedbrowser/outdatedbrowser.min.js" defer></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        outdatedBrowser({
+            bgColor: '#f25648',
+            color: '#ffffff',
+            lowerThan: 'flex'
+        });
+    });
+</script>
+
+
+    
+    
+<script src="https://cdn.jsdelivr.net/npm/mathjax@2.7.5/unpacked/MathJax.js?config=TeX-MML-AM_CHTML" defer></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    MathJax.Hub.Config({
+        'HTML-CSS': {
+            matchFontHeight: false
+        },
+        SVG: {
+            matchFontHeight: false
+        },
+        CommonHTML: {
+            matchFontHeight: false
+        },
+        tex2jax: {
+            inlineMath: [
+                ['$','$'],
+                ['\\(','\\)']
+            ]
+        }
+    });
+});
+</script>
+
+    
+    
+
+<a id="back-to-top" title="回到顶端" href="javascript:;">
+    <i class="fas fa-chevron-up"></i>
+</a>
+<script src="/js/back-to-top.js" defer></script>
+
+
+    
+    
+
+    
+    
+    
+    
+
+    
+    
+    
+    
+    
+
+    
+
+
+<script src="/js/main.js" defer></script>
+
+    
+    <div class="searchbox ins-search">
+    <div class="searchbox-container ins-search-container">
+        <div class="searchbox-input-wrapper">
+            <input type="text" class="searchbox-input ins-search-input" placeholder="想要查找什么...">
+            <span class="searchbox-close ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="searchbox-result-wrapper ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script>
+    (function (window) {
+        var INSIGHT_CONFIG = {
+            TRANSLATION: {
+                POSTS: '文章',
+                PAGES: '页面',
+                CATEGORIES: '分类',
+                TAGS: '标签',
+                UNTITLED: '(无标题)',
+            },
+            CONTENT_URL: '/content.json',
+        };
+        window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+    })(window);
+</script>
+<script src="/js/insight.js" defer></script>
+<link rel="stylesheet" href="/css/search.css">
+<link rel="stylesheet" href="/css/insight.css">
+    
+</body>
+</html>

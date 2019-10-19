@@ -146,6 +146,62 @@
         
         <div class="level article-meta is-size-7 is-uppercase is-mobile is-overflow-x-auto">
             <div class="level-left">
+                <time class="level-item has-text-grey" datetime="2019-10-19T11:00:00.000Z">2019-10-19</time>
+                
+                <div class="level-item">
+                <a class="has-link-grey -link" href="/categories/Android-Framework/">Android Framework</a>&nbsp;/&nbsp;<a class="has-link-grey -link" href="/categories/Android-Framework/Binder/">Binder</a>
+                </div>
+                
+                
+                
+            </div>
+        </div>
+        
+        <h1 class="title is-size-3 is-size-4-mobile has-text-weight-normal">
+            
+                <a class="has-link-black-ter" href="/Binder代理机制/">Binder代理机制</a>
+            
+        </h1>
+        <div class="content">
+            <blockquote>
+<p>本文分析基于Android P(9.0) 源码</p>
+</blockquote>
+<p>Binder是Android中RPC(Remote Procedure Call)的主要实现机制，它在Android中随处可见，是基石一般的存在。了解Binder的朋友可能都听过代理(Proxy)、引用(Ref)之类的名词，然而关于它们的细节可能未必清楚。</p>
+<p>之前在学习Binder的时候，参考过很多书籍和博客。几乎所有文章在谈到如何获取Binder代理对象时，都认为首先需要将service对象注册到ServiceManager中去，之后再由Client进程从ServiceManager中获取它的代理对象。这种说法并没有错，但却不够深入。</p>
+<ol>
+<li>ServiceManager中存储的也是service对象的代理对象，那么（一个service对象的）第一个代理对象到底是如何生成的呢？</li>
+<li>获取Binder代理对象有两种方式，除了通过ServiceManager获取外，还可以通过已有的 Binder通信管道将本端的实体对象（或代理对象）发送到对端，使对端获取到Binder代理对象。</li>
+<li>通过调用一个Binder代理对象的方法，为何可以将数据发送到对端的实体对象？这中间涉及代理对象到实体对象的<strong><a href="https://zh.wikipedia.org/wiki/%E8%B7%AF%E7%94%B1" target="_blank" rel="noopener">路由</a></strong>过程（“路由”用在这里，表示如何从Binder代理对象出发，找到其对应的Binder实体对象），需要详述。【见Binder世界中的代理机制（下）】</li>
+</ol>
+<p>我认为以上这些才是理解“代理”二字的关键。而ServiceManager只是一种集中管理的方式，它通过字符串和Binder代理对象的键值对来记录整个系统中的service，类似于我们上网时的DNS服务器。但本质上说它和“代理”二字并没有必然的关联。</p>
+        </div>
+        
+        
+        <div class="level is-mobile">
+            <div class="level-start">
+                <div class="level-item">
+                <a class="button is-size-7 is-light" href="/Binder代理机制/">阅读更多</a>
+                </div>
+            </div>
+        </div>
+        
+        
+    </div>
+</div>
+
+
+
+
+
+
+
+
+    <div class="card">
+    
+    <div class="card-content article ">
+        
+        <div class="level article-meta is-size-7 is-uppercase is-mobile is-overflow-x-auto">
+            <div class="level-left">
                 <time class="level-item has-text-grey" datetime="2019-10-10T08:00:00.000Z">2019-10-10</time>
                 
                 <div class="level-item">
@@ -241,7 +297,7 @@
                         文章
                     </p>
                     <p class="title has-text-weight-normal">
-                        2
+                        3
                     </p>
                 </div>
             </div>
@@ -261,7 +317,7 @@
                         标签
                     </p>
                     <p class="title has-text-weight-normal">
-                        5
+                        6
                     </p>
                 </div>
             </div>
