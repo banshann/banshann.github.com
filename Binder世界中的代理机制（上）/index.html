@@ -16,7 +16,7 @@
 <meta property="og:description" content="本文分析基于Android P(9.0) 源码  Binder是Android中RPC(Remote Procedure Call)的主要实现机制，它在Android中随处可见，是基石一般的存在。了解Binder的朋友可能都听过代理(Proxy)、引用(Ref)之类的名词，然而关于它们的细节可能未必清楚。 之前在学习Binder的时候，参考过很多书籍和博客。几乎所有文章在谈到如何获取Binder">
 <meta property="og:locale" content="zh-CN">
 <meta property="og:image" content="https://banshan.tech/images/og_image.png">
-<meta property="og:updated_time" content="2019-10-19T11:22:49.316Z">
+<meta property="og:updated_time" content="2019-10-21T03:19:23.017Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Binder世界中的代理机制（上）">
 <meta name="twitter:description" content="本文分析基于Android P(9.0) 源码  Binder是Android中RPC(Remote Procedure Call)的主要实现机制，它在Android中随处可见，是基石一般的存在。了解Binder的朋友可能都听过代理(Proxy)、引用(Ref)之类的名词，然而关于它们的细节可能未必清楚。 之前在学习Binder的时候，参考过很多书籍和博客。几乎所有文章在谈到如何获取Binder">
@@ -176,7 +176,11 @@
 <a id="more"></a>
 
 <p>所以本文希望通过一个新的视角，将Binder世界中的代理过程和盘托出。</p>
-<p>下面为了方便分析，我们选定ApplicationThread类作为研究对象。</p>
+<p>我们假设在最初始的状态，进程和进程之间是无法通信的。这时为了解决通信问题，出现了Binder机制。可是Binder机制有一个前提，就是如果想要和对端进程通信，必须要先拿到对端进程中Binder实体对象的代理对象。可是这个代理对象要怎么获得呢？是向ServiceManager获取么？注意，向ServiceManager获取也是一个跨进程通信过程。所以为了跨进程通信，我们需要获取一个Binder代理对象，可是为了获取Binder代理对象，我们又需要跨进程通信。这个过程似乎陷入一个“死锁”。</p>
+<p>为了解决这个问题，Android在设计整套机制时预先加入了一个先验知识：ServiceManager的代理对象在每一个进程中的handle值都为0。因此，任何进程和ServiceManager进程的通信便不再需要事先获取它的代理对象，而只需要告诉Binder Driver：我需要和handle值为0的进程通信。Binder Driver便会自动将该进程的通信请求转发到ServiceManager进程。这样上面所说的“死锁”便被打破了，下面接着讨论Binder代理对象如何获得。</p>
+<p>当一个进程A需要往ServiceManager中注册service时，本质上是将A进程中创建的service对象（Binder实体对象）作为addService的参数发送到ServiceManager进程(在这次Binder通信中，传输的数据含有Binder实体对象)。这个Binder实体对象作为参数，会经历writeStrongParcel和readStrongParcel的打包和解包过程。通常，一个普通数据的打包解包主要就是序列化和反序列化的过程，而Binder实体对象除了这些常规操作外，还会在打包过程中创建Binder实体对象的Native层中间形态，在解包过程中创建Binder代理对象的Java层/Native层中间形态。另外，在Binder Driver所控制的传输过程中也会创建Binder实体对象和代理对象的Kernel层中间形态。这样一来，ServiceManager在接收到Binder实体对象时，它实际上已经变成了Binder代理对象的Java层中间形态：BinderProxy对象。</p>
+<p>事实上，这个Binder实体对象经过Binder通信传输转化为Binder代理对象的过程不仅可以普通进程和ServiceManager进程之间，也同样可以发生在两个普通进程之间。除此之外，Binder通信过程中不仅可以完成实体对象到代理对象的转换，也可以完成一个代理对象到另一个代理对象的转换。</p>
+<p>下面我们具体阐述两个普通进程间Binder实体对象转换为Binder代理对象的过程。为了方便分析，我们选定ApplicationThread类作为研究对象。</p>
 <p>老子说：“一生二，二生三，三生万物”。那么在Binder的世界中，“一”到底来自何方？</p>
 <h2 id="1-Binder实体对象的出现和意义"><a href="#1-Binder实体对象的出现和意义" class="headerlink" title="1. Binder实体对象的出现和意义"></a>1. Binder实体对象的出现和意义</h2><h3 id="1-1-Binder实体对象是什么？"><a href="#1-1-Binder实体对象是什么？" class="headerlink" title="1.1 Binder实体对象是什么？"></a>1.1 Binder实体对象是什么？</h3><p>所有的RPC（远程过程调用），最终都需要一个实体来根据传输数据执行相应的操作。在Binder的世界中可以将它称为Binder实体对象（名字是我自己斟酌的，可能欠妥，但含义已经表达清楚。看过老罗书和文章的人可能听过“实体对象”、“本地对象”、“引用对象”之类的名字，但我认为那样会增加理解的复杂度，因此这里放弃罗哥的命名方式），表示它才是真正干活的那个人。它就是Binder世界中的“一”，从它创建（在Server进程中被创建）的那一刻起，Binder世界便有了基石。对于ApplicationThread的Binder通信而言，其最终的执行体是位于Java层的ApplicationThread对象。因此在接下来的Binder通信过程中，我们将它称为Binder实体对象。</p>
 <p><a href="http://androidxref.com/9.0.0_r3/xref/frameworks/base/core/java/android/app/ActivityThread.java#757" target="_blank" rel="noopener">/frameworks/base/core/java/android/app/ActivityThread.java</a></p>
